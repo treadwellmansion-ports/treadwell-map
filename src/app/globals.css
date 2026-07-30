@@ -12,12 +12,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* This app is intentionally single-themed (parchment/cream throughout, no
+   dark mode) -- deliberately no `prefers-color-scheme: dark` override here.
+   That default Next.js scaffold behavior was flipping --foreground to
+   near-white on dark-mode systems, which made unstyled text (e.g. what you
+   type into form inputs) invisible against the app's light backgrounds. */
 
 body {
   background: var(--background);
