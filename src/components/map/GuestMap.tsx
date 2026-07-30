@@ -1,7 +1,7 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import MapLibreMap, { type MapRef } from "react-map-gl/maplibre";
 import Supercluster, { type ClusterFeature, type PointFeature } from "supercluster";
 import type { Recommendation } from "@/lib/types";
@@ -10,6 +10,8 @@ import { useRecommendations } from "@/hooks/useRecommendations";
 import { useMapConfig } from "@/hooks/useMapConfig";
 import { useCategoryStyles } from "@/hooks/useCategoryStyles";
 import { useFilters } from "@/hooks/useFilters";
+import { useIdleReset } from "@/hooks/useIdleReset";
+import { logEvent } from "@/lib/analytics";
 import { StarMarker } from "./StarMarker";
 import { TreadwellMarker } from "./TreadwellMarker";
 import { ClusterMarker } from "./ClusterMarker";
@@ -75,12 +77,12 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     setSelectedEntity({ type: "recommendation", data: recommendation });
     setView("map");
     flyTo(recommendation.lat, recommendation.lng);
+    logEvent({ type: "view_recommendation", recommendationId: recommendation.id });
   }
 
-  function selectTreadwell() {
-    setSelectedEntity({ type: "treadwell" });
-    setView("map");
-    flyTo(TREADWELL_ORIGIN.lat, TREADWELL_ORIGIN.lng, Math.max(zoom, 17));
+  function changeView(nextView: "map" | "list") {
+    setView(nextView);
+    logEvent({ type: "view_toggle", viewMode: nextView });
   }
 
   function returnToDowntown() {
@@ -90,6 +92,30 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
       zoom: mapConfig.zoom,
       duration: 1000,
     });
+  }
+
+  // On the kiosk, a guest walking away shouldn't leave their search/filters
+  // for the next person -- clear everything and return to the default view.
+  function resetToDefault() {
+    setView("map");
+    filters.showAll();
+    returnToDowntown();
+  }
+
+  useIdleReset(resetToDefault, variant === "kiosk");
+
+  // Debounced so we log intent-to-search, not every keystroke.
+  useEffect(() => {
+    const query = filters.query.trim();
+    if (!query) return;
+    const timer = setTimeout(() => logEvent({ type: "search", query }), 800);
+    return () => clearTimeout(timer);
+  }, [filters.query]);
+
+  function selectTreadwell() {
+    setSelectedEntity({ type: "treadwell" });
+    setView("map");
+    flyTo(TREADWELL_ORIGIN.lat, TREADWELL_ORIGIN.lng, Math.max(zoom, 17));
   }
 
   function returnToTreadwell() {
@@ -120,7 +146,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           <div className="flex overflow-hidden rounded-full bg-white/95 text-sm font-medium shadow-md ring-1 ring-black/10">
             <button
               type="button"
-              onClick={() => setView("map")}
+              onClick={() => changeView("map")}
               className="px-4 py-2"
               style={{ backgroundColor: view === "map" ? "#1B1408" : "transparent", color: view === "map" ? "#F4E9D6" : "#4A3B2A" }}
             >
@@ -128,7 +154,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
             </button>
             <button
               type="button"
-              onClick={() => setView("list")}
+              onClick={() => changeView("list")}
               className="px-4 py-2"
               style={{ backgroundColor: view === "list" ? "#1B1408" : "transparent", color: view === "list" ? "#F4E9D6" : "#4A3B2A" }}
             >

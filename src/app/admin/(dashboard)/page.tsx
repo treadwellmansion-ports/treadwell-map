@@ -5,6 +5,30 @@ import { useRecommendations } from "@/hooks/useRecommendations";
 import { useCategoryStyles } from "@/hooks/useCategoryStyles";
 import { StarIcon } from "@/components/map/StarIcon";
 
+const CSV_COLUMNS = [
+  "name",
+  "category",
+  "description",
+  "address",
+  "phone",
+  "website",
+  "hours",
+  "published",
+  "isSelect",
+  "selectNote",
+  "displayOrder",
+  "lat",
+  "lng",
+  "walkingDistanceMeters",
+  "walkingTimeMinutes",
+] as const;
+
+function csvEscape(value: unknown): string {
+  const str = value === null || value === undefined ? "" : String(value);
+  if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
+  return str;
+}
+
 export default function AdminRecommendationsPage() {
   const { recommendations, loading, reload } = useRecommendations();
   const { categoryStyles } = useCategoryStyles();
@@ -20,16 +44,40 @@ export default function AdminRecommendationsPage() {
     reload();
   }
 
+  function exportCsv() {
+    const lines = [
+      CSV_COLUMNS.join(","),
+      ...sorted.map((r) => CSV_COLUMNS.map((col) => csvEscape(r[col])).join(",")),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `treadwell-recommendations-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-[#1B1408]">Recommendations</h1>
-        <Link
-          href="/admin/recommendations/new"
-          className="rounded-full bg-[#1B1408] px-4 py-2 text-sm font-semibold text-[#F4E9D6] hover:bg-[#2a2012]"
-        >
-          + New Recommendation
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={exportCsv}
+            disabled={sorted.length === 0}
+            className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-40"
+          >
+            Export CSV
+          </button>
+          <Link
+            href="/admin/recommendations/new"
+            className="rounded-full bg-[#1B1408] px-4 py-2 text-sm font-semibold text-[#F4E9D6] hover:bg-[#2a2012]"
+          >
+            + New Recommendation
+          </Link>
+        </div>
       </div>
 
       {loading ? (

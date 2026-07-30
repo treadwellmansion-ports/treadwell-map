@@ -7,6 +7,8 @@ const NAV = [
   { href: "/admin/selects", label: "Treadwell Selects" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/settings", label: "Map Settings" },
+  { href: "/admin/analytics", label: "Analytics" },
+  { href: "/admin/reports", label: "Reported Issues" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

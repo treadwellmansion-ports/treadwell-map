@@ -5,6 +5,7 @@ import { TREADWELL_ORIGIN } from "@/lib/constants";
 import { formatWalkingInfo } from "@/lib/geo/directions";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { StarIcon } from "./StarIcon";
+import { ReportIssueButton } from "./ReportIssueButton";
 
 export type SelectedEntity =
   | { type: "recommendation"; data: Recommendation }
@@ -209,6 +210,8 @@ function RecommendationContent({
           Next →
         </button>
       </div>
+
+      <ReportIssueButton recommendationId={recommendation.id} recommendationName={recommendation.name} />
     </div>
   );
 }
