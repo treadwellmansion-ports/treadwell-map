@@ -15,7 +15,7 @@
     }
   },
   "sprite": "https://tiles.openfreemap.org/sprites/ofm_f384/ofm",
-  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "glyphs": "https://fonts.openmaptiles.org/{fontstack}/{range}.pbf",
   "layers": [
     {
       "id": "background",
@@ -4156,7 +4156,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-letter-spacing": 0.2,
         "text-max-width": 5,
@@ -4217,7 +4217,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-letter-spacing": 0.2,
         "text-max-width": 5,
@@ -4292,7 +4292,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-letter-spacing": 0.2,
         "text-max-width": 5,
@@ -4385,7 +4385,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-max-width": 9,
         "text-offset": [
@@ -4491,7 +4491,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-max-width": 9,
         "text-offset": [
@@ -4597,7 +4597,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-max-width": 9,
         "text-offset": [
@@ -4674,7 +4674,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-max-width": 9,
         "text-offset": [
@@ -4738,7 +4738,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-rotation-alignment": "map",
         "text-size": [
@@ -4829,7 +4829,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-rotation-alignment": "map",
         "text-size": [
@@ -4906,7 +4906,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-rotation-alignment": "map",
         "text-size": [
@@ -5001,7 +5001,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-rotation-alignment": "viewport",
         "text-size": 10
@@ -5084,7 +5084,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-rotation-alignment": "viewport",
         "text-size": 10
@@ -5166,7 +5166,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-rotation-alignment": "viewport",
         "text-size": 10
@@ -5221,7 +5221,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-max-width": 9,
         "text-offset": [
@@ -5294,7 +5294,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-letter-spacing": 0.1,
         "text-max-width": 9,
@@ -5379,7 +5379,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-max-width": 8,
         "text-size": [
@@ -5463,7 +5463,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-max-width": 8,
         "text-size": [
@@ -5535,7 +5535,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Italic"
+          "PT Serif Italic"
         ],
         "text-letter-spacing": 0.2,
         "text-max-width": 9,
@@ -5631,7 +5631,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Regular"
+          "PT Serif Regular"
         ],
         "text-max-width": 8,
         "text-offset": [
@@ -5732,7 +5732,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Bold"
+          "PT Serif Bold"
         ],
         "text-max-width": 8,
         "text-offset": [
@@ -5821,7 +5821,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Bold"
+          "PT Serif Bold"
         ],
         "text-max-width": 6.25,
         "text-size": [
@@ -5902,7 +5902,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Bold"
+          "PT Serif Bold"
         ],
         "text-max-width": 6.25,
         "text-size": [
@@ -5983,7 +5983,7 @@
           ]
         ],
         "text-font": [
-          "Noto Sans Bold"
+          "PT Serif Bold"
         ],
         "text-max-width": 6.25,
         "text-size": [
