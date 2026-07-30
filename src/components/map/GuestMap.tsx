@@ -95,11 +95,17 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   }
 
   // On the kiosk, a guest walking away shouldn't leave their search/filters
-  // for the next person -- clear everything and return to the default view.
+  // for the next person -- clear everything and recenter on the Treadwell
+  // itself (not just the downtown default), per the idle-reset request.
   function resetToDefault() {
+    setSelectedEntity(null);
     setView("map");
     filters.showAll();
-    returnToDowntown();
+    mapRef.current?.flyTo({
+      center: [TREADWELL_ORIGIN.lng, TREADWELL_ORIGIN.lat],
+      zoom: Math.max(mapConfig.zoom, 17),
+      duration: 1000,
+    });
   }
 
   useIdleReset(resetToDefault, variant === "kiosk");
