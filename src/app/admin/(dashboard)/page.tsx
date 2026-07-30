@@ -8,6 +8,7 @@ import { StarIcon } from "@/components/map/StarIcon";
 const CSV_COLUMNS = [
   "name",
   "category",
+  "additionalCategories",
   "description",
   "address",
   "phone",
@@ -107,7 +108,17 @@ export default function AdminRecommendationsPage() {
                       <StarIcon color={style.color} size={18} />
                     </td>
                     <td className="px-4 py-3 font-medium text-[#1B1408]">{r.name}</td>
-                    <td className="px-4 py-3 text-neutral-600">{style.label}</td>
+                    <td className="px-4 py-3 text-neutral-600">
+                      {style.label}
+                      {r.additionalCategories.length > 0 && (
+                        <span
+                          className="ml-1.5 text-xs text-neutral-400"
+                          title={r.additionalCategories.map((c) => categoryStyles[c].label).join(", ")}
+                        >
+                          +{r.additionalCategories.length} more
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {r.isSelect && (
                         <span className="rounded-full bg-[#A98235] px-2 py-0.5 text-xs font-semibold text-white">

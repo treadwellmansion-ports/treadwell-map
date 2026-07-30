@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { recommendationFromRow, type RecommendationRow } from "@/lib/types";
-import { badRequest, isCategory, unauthorized } from "@/lib/api-helpers";
+import { badRequest, isCategory, parseAdditionalCategories, unauthorized } from "@/lib/api-helpers";
 import { SELECTS_CAP, TREADWELL_ORIGIN } from "@/lib/constants";
 import { getWalkingInfo } from "@/lib/geo/directions";
 
@@ -12,7 +12,7 @@ export async function GET() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("recommendations")
-    .select("*")
+    .select("*, recommendation_categories(category)")
     .order("display_order", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
     return badRequest("address is required");
   if (typeof body.lat !== "number" || typeof body.lng !== "number")
     return badRequest("lat/lng are required numbers");
+
+  const additional = parseAdditionalCategories(body.additionalCategories, body.category);
+  if ("error" in additional) return badRequest(additional.error);
 
   if (body.isSelect) {
     const { count, error: countError } = await supabase
@@ -89,5 +92,13 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json(recommendationFromRow(data as RecommendationRow), { status: 201 });
+  const row = data as RecommendationRow;
+  const categorySet = [row.category, ...additional.categories];
+  const { error: catError } = await supabase
+    .from("recommendation_categories")
+    .insert(categorySet.map((category) => ({ recommendation_id: row.id, category })));
+  if (catError) return NextResponse.json({ error: catError.message }, { status: 500 });
+
+  row.recommendation_categories = categorySet.map((category) => ({ category }));
+  return NextResponse.json(recommendationFromRow(row), { status: 201 });
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { recommendationFromRow, type RecommendationRow } from "@/lib/types";
-import { badRequest, isCategory, notFound, unauthorized } from "@/lib/api-helpers";
+import { badRequest, isCategory, notFound, parseAdditionalCategories, unauthorized } from "@/lib/api-helpers";
 import { SELECTS_CAP, TREADWELL_ORIGIN } from "@/lib/constants";
 import { getWalkingInfo } from "@/lib/geo/directions";
 
@@ -10,7 +10,11 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_request: NextRequest, { params }: Params) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data, error } = await supabase.from("recommendations").select("*").eq("id", id).single();
+  const { data, error } = await supabase
+    .from("recommendations")
+    .select("*, recommendation_categories(category)")
+    .eq("id", id)
+    .single();
 
   if (error || !data) return notFound();
   return NextResponse.json(recommendationFromRow(data as RecommendationRow));
@@ -35,6 +39,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const body = await request.json();
   if (body.category !== undefined && !isCategory(body.category))
     return badRequest("category is invalid");
+
+  const nextPrimaryCategory = body.category ?? existing.category;
+  const touchesCategories = body.category !== undefined || body.additionalCategories !== undefined;
+  const additional = parseAdditionalCategories(body.additionalCategories, nextPrimaryCategory);
+  if ("error" in additional) return badRequest(additional.error);
 
   const wantsSelect = body.isSelect ?? existing.is_select;
   if (wantsSelect && !existing.is_select) {
@@ -90,7 +99,31 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(recommendationFromRow(data as RecommendationRow));
+  const row = data as RecommendationRow;
+
+  if (touchesCategories) {
+    const categorySet = [row.category, ...additional.categories];
+    const { error: deleteError } = await supabase
+      .from("recommendation_categories")
+      .delete()
+      .eq("recommendation_id", id);
+    if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+
+    const { error: insertError } = await supabase
+      .from("recommendation_categories")
+      .insert(categorySet.map((category) => ({ recommendation_id: id, category })));
+    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+    row.recommendation_categories = categorySet.map((category) => ({ category }));
+  } else {
+    const { data: existingCats } = await supabase
+      .from("recommendation_categories")
+      .select("category")
+      .eq("recommendation_id", id);
+    row.recommendation_categories = existingCats ?? [];
+  }
+
+  return NextResponse.json(recommendationFromRow(row));
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {

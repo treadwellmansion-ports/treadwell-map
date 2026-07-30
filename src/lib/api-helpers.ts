@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
-import { CATEGORIES, type Category } from "./types";
+import { CATEGORIES, MAX_ADDITIONAL_CATEGORIES, type Category } from "./types";
 
 export function isCategory(value: unknown): value is Category {
   return typeof value === "string" && (CATEGORIES as readonly string[]).includes(value);
+}
+
+// Validates the optional "additional categories" list a recommendation can
+// carry alongside its primary category. Returns the deduped, primary-excluded
+// list, or an error message to surface to the admin.
+export function parseAdditionalCategories(
+  value: unknown,
+  primary: Category
+): { categories: Category[] } | { error: string } {
+  if (value === undefined || value === null) return { categories: [] };
+  if (!Array.isArray(value)) return { error: "additionalCategories must be an array" };
+  if (value.length > MAX_ADDITIONAL_CATEGORIES) {
+    return { error: `You can add at most ${MAX_ADDITIONAL_CATEGORIES} additional categories` };
+  }
+  const result: Category[] = [];
+  for (const v of value) {
+    if (!isCategory(v)) return { error: `"${v}" is not a valid category` };
+    if (v === primary) continue;
+    if (!result.includes(v)) result.push(v);
+  }
+  return { categories: result };
 }
 
 export function badRequest(message: string) {

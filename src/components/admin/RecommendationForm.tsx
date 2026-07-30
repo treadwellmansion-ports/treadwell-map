@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CATEGORIES, type Category, type CategoryStyleMap, type Recommendation } from "@/lib/types";
+import { CATEGORIES, MAX_ADDITIONAL_CATEGORIES, type Category, type CategoryStyleMap, type Recommendation } from "@/lib/types";
 import { DEFAULT_MAP_CONFIG, SELECTS_CAP, SELECT_RING_COLOR } from "@/lib/constants";
 import { StarIcon } from "@/components/map/StarIcon";
 import { PhotoUploader } from "./PhotoUploader";
@@ -14,6 +14,7 @@ const INPUT_CLASS =
 export interface RecommendationFormValues {
   name: string;
   category: Category;
+  additionalCategories: Category[];
   description: string;
   address: string;
   lat: number;
@@ -33,6 +34,7 @@ function toFormValues(r: Recommendation | null): RecommendationFormValues {
     return {
       name: "",
       category: "restaurant",
+      additionalCategories: [],
       description: "",
       address: "",
       lat: DEFAULT_MAP_CONFIG.centerLat,
@@ -50,6 +52,7 @@ function toFormValues(r: Recommendation | null): RecommendationFormValues {
   return {
     name: r.name,
     category: r.category,
+    additionalCategories: r.additionalCategories,
     description: r.description,
     address: r.address,
     lat: r.lat,
@@ -96,6 +99,7 @@ export function RecommendationForm({
     const body = {
       name: values.name,
       category: values.category,
+      additionalCategories: values.additionalCategories,
       description: values.description,
       address: values.address,
       lat: values.lat,
@@ -160,6 +164,8 @@ export function RecommendationForm({
         </span>
         <span className="text-sm text-neutral-600">
           {style.label}
+          {values.additionalCategories.length > 0 &&
+            ` + ${values.additionalCategories.map((c) => categoryStyles[c].label).join(", ")}`}
           {values.isSelect && " -- Treadwell Selects"}
         </span>
       </div>
@@ -176,7 +182,14 @@ export function RecommendationForm({
       <Field label="Category">
         <select
           value={values.category}
-          onChange={(e) => set("category", e.target.value as Category)}
+          onChange={(e) => {
+            const category = e.target.value as Category;
+            setValues((prev) => ({
+              ...prev,
+              category,
+              additionalCategories: prev.additionalCategories.filter((c) => c !== category),
+            }));
+          }}
           className={INPUT_CLASS}
         >
           {CATEGORIES.map((c) => (
@@ -185,6 +198,43 @@ export function RecommendationForm({
             </option>
           ))}
         </select>
+        <p className="mt-1 text-xs text-neutral-500">This drives the star&apos;s color on the map.</p>
+      </Field>
+
+      <Field label={`Additional categories (optional, up to ${MAX_ADDITIONAL_CATEGORIES})`}>
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.filter((c) => c !== values.category).map((c) => {
+            const checked = values.additionalCategories.includes(c);
+            const atAdditionalCap = values.additionalCategories.length >= MAX_ADDITIONAL_CATEGORIES;
+            return (
+              <label
+                key={c}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm ${
+                  checked ? "border-[#A98235] bg-[#A98235]/10" : "border-neutral-300"
+                } ${!checked && atAdditionalCap ? "opacity-40" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={!checked && atAdditionalCap}
+                  onChange={(e) =>
+                    setValues((prev) => ({
+                      ...prev,
+                      additionalCategories: e.target.checked
+                        ? [...prev.additionalCategories, c]
+                        : prev.additionalCategories.filter((x) => x !== c),
+                    }))
+                  }
+                />
+                {categoryStyles[c].label}
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-1 text-xs text-neutral-500">
+          A guest filtering by any of these will also see this recommendation. Its star still only shows in
+          its primary category&apos;s color.
+        </p>
       </Field>
 
       <Field label="Description">

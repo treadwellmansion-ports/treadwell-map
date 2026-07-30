@@ -18,7 +18,8 @@ export interface StructuredHours {
 export interface Recommendation {
   id: string;
   name: string;
-  category: Category;
+  category: Category; // primary category -- drives the star's color
+  additionalCategories: Category[]; // up to 2 more, for filter-matching only
   description: string;
   address: string;
   lat: number;
@@ -36,6 +37,13 @@ export interface Recommendation {
   createdAt: string;
   updatedAt: string;
 }
+
+// All categories this recommendation matches when filtering (primary + additional).
+export function allCategories(r: Pick<Recommendation, "category" | "additionalCategories">): Category[] {
+  return [r.category, ...r.additionalCategories];
+}
+
+export const MAX_ADDITIONAL_CATEGORIES = 2;
 
 export interface CategoryStyle {
   category: Category;
@@ -77,6 +85,9 @@ export interface RecommendationRow {
   walking_time_minutes: number | null;
   created_at: string;
   updated_at: string;
+  // Embedded via Supabase's `*, recommendation_categories(category)` select --
+  // the full category set (primary + additional) for this recommendation.
+  recommendation_categories?: { category: Category }[];
 }
 
 export interface CategoryStyleRow {
@@ -97,10 +108,15 @@ export interface MapConfigRow {
 }
 
 export function recommendationFromRow(row: RecommendationRow): Recommendation {
+  const additionalCategories = (row.recommendation_categories ?? [])
+    .map((rc) => rc.category)
+    .filter((c) => c !== row.category);
+
   return {
     id: row.id,
     name: row.name,
     category: row.category,
+    additionalCategories: [...new Set(additionalCategories)],
     description: row.description,
     address: row.address,
     lat: row.lat,

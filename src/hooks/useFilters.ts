@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Category, Recommendation } from "@/lib/types";
+import { allCategories, type Category, type Recommendation } from "@/lib/types";
 
 export function useFilters(recommendations: Recommendation[]) {
   const [selectedCategories, setSelectedCategories] = useState<Set<Category>>(new Set());
@@ -29,10 +29,13 @@ export function useFilters(recommendations: Recommendation[]) {
     const q = query.trim().toLowerCase();
     return recommendations.filter((r) => {
       if (!r.published) return false;
-      if (selectedCategories.size > 0 && !selectedCategories.has(r.category)) return false;
+      if (selectedCategories.size > 0) {
+        const matchesAny = allCategories(r).some((c) => selectedCategories.has(c));
+        if (!matchesAny) return false;
+      }
       if (selectsOnly && !r.isSelect) return false;
       if (q) {
-        const haystack = `${r.name} ${r.description} ${r.category}`.toLowerCase();
+        const haystack = `${r.name} ${r.description} ${allCategories(r).join(" ")}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;

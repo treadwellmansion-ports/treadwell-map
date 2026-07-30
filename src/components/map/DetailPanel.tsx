@@ -111,11 +111,18 @@ function RecommendationContent({
         )}
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <StarIcon color={style.color} size={16} outlineWidth={1} />
-        <span className="text-sm font-medium" style={{ color: style.color }}>
-          {style.label}
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="flex items-center gap-2">
+          <StarIcon color={style.color} size={16} outlineWidth={1} />
+          <span className="text-sm font-medium" style={{ color: style.color }}>
+            {style.label}
+          </span>
         </span>
+        {recommendation.additionalCategories.map((c) => (
+          <span key={c} className="text-xs text-neutral-500">
+            + {categoryStyles[c].label}
+          </span>
+        ))}
       </div>
 
       {recommendation.isSelect && recommendation.selectNote && (
