@@ -12,15 +12,18 @@ export function MarkerPositionPicker({
   address,
   color,
   onChange,
+  onAddressChange,
 }: {
   lat: number;
   lng: number;
   address: string;
   color: string;
   onChange: (lat: number, lng: number) => void;
+  onAddressChange: (address: string) => void;
 }) {
   const mapRef = useRef<MapRef | null>(null);
   const [geocoding, setGeocoding] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleGeocode() {
@@ -51,6 +54,30 @@ export function MarkerPositionPicker({
     }
   }
 
+  async function handleDragEnd(newLat: number, newLng: number) {
+    onChange(newLat, newLng);
+    setLocating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/reverse-geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: newLat, lng: newLng }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Reverse geocoding failed");
+      onAddressChange(data.address);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Moved the pin, but couldn't look up the new address automatically (${err.message}) -- edit the Address field by hand if needed.`
+          : "Moved the pin, but couldn't look up the new address automatically -- edit the Address field by hand if needed."
+      );
+    } finally {
+      setLocating(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2">
@@ -62,7 +89,9 @@ export function MarkerPositionPicker({
         >
           {geocoding ? "Locating..." : "Geocode from address"}
         </button>
-        <span className="text-xs text-neutral-500">or drag the marker to correct/override</span>
+        <span className="text-xs text-neutral-500">
+          {locating ? "Looking up new address..." : "or drag the marker to correct/override"}
+        </span>
       </div>
       {error && <p className="mt-1 text-sm text-amber-700">{error}</p>}
 
@@ -78,7 +107,7 @@ export function MarkerPositionPicker({
             latitude={lat}
             anchor="bottom"
             draggable
-            onDragEnd={(e) => onChange(e.lngLat.lat, e.lngLat.lng)}
+            onDragEnd={(e) => handleDragEnd(e.lngLat.lat, e.lngLat.lng)}
           >
             <div className="cursor-grab active:cursor-grabbing">
               <StarIcon color={color} size={28} />

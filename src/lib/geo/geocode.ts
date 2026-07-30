@@ -35,3 +35,23 @@ export async function geocodeAddress(address: string): Promise<GeocodeResult | n
     placeName: match.display_name,
   };
 }
+
+// Used when a staff member drags the marker to a new position: turns that
+// position back into a human-readable address so the Address field reflects
+// where the pin actually is, instead of silently drifting out of sync.
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  const url = new URL("https://nominatim.openstreetmap.org/reverse");
+  url.searchParams.set("lat", String(lat));
+  url.searchParams.set("lon", String(lng));
+  url.searchParams.set("format", "json");
+
+  const res = await fetch(url.toString(), {
+    headers: { "User-Agent": "treadwell-map-admin/1.0 (recommendation geocoding)" },
+  });
+  if (!res.ok) {
+    throw new Error(`Nominatim reverse geocoding failed: ${res.status} ${res.statusText}`);
+  }
+
+  const data = (await res.json()) as { display_name?: string };
+  return data.display_name ?? null;
+}

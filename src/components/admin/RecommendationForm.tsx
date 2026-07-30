@@ -212,6 +212,7 @@ export function RecommendationForm({
           address={values.address}
           color={style.color}
           onChange={(lat, lng) => setValues((prev) => ({ ...prev, lat, lng }))}
+          onAddressChange={(address) => setValues((prev) => ({ ...prev, address }))}
         />
       </Field>
 
