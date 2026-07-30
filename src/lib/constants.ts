@@ -26,6 +26,8 @@ export const DEFAULT_CATEGORY_STYLES: CategoryStyleMap = {
   historical: { category: "historical", color: "#A98235", label: "Historical Sites" },
   shop: { category: "shop", color: "#3F6844", label: "Shops" },
   art: { category: "art", color: "#76517B", label: "Art" },
+  outdoor: { category: "outdoor", color: "#3E7C7C", label: "Outdoor & Waterfront" },
+  nightlife: { category: "nightlife", color: "#4B3862", label: "Nightlife & Bars" },
 };
 
 export const SELECT_RING_COLOR = "#A98235";
