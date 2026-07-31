@@ -2,7 +2,7 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import MapLibreMap, { type MapRef } from "react-map-gl/maplibre";
+import MapLibreMap, { type MapEvent, type MapRef } from "react-map-gl/maplibre";
 import Supercluster, { type ClusterFeature, type PointFeature } from "supercluster";
 import type { Recommendation } from "@/lib/types";
 import { DEFAULT_MAP_STYLE_URL, TREADWELL_ORIGIN } from "@/lib/constants";
@@ -20,6 +20,28 @@ import { Legend } from "./Legend";
 import { SearchBar } from "./SearchBar";
 import { ListView } from "./ListView";
 import { DetailPanel, type SelectedEntity } from "./DetailPanel";
+import { CompassRose } from "./CompassRose";
+
+// Baked into the basemap itself (via a runtime background-pattern, not a
+// screen-space overlay) so it always sits under every marker -- a DOM
+// overlay would sit above the marker layer and dull the stars.
+function handleMapLoad(e: MapEvent) {
+  const map = e.target;
+  if (map.hasImage("paper-grain")) return;
+  map
+    .loadImage("/map-styles/paper-grain.png")
+    .then(({ data: image }) => {
+      if (!image || map.hasImage("paper-grain")) return;
+      map.addImage("paper-grain", image);
+      if (map.getLayer("background")) {
+        map.setPaintProperty("background", "background-pattern", "paper-grain");
+      }
+    })
+    .catch(() => {
+      // Non-critical decoration -- if it fails to load, the flat parchment
+      // background-color already set in the style JSON is a fine fallback.
+    });
+}
 
 type ClusterProps = { recommendationId: string };
 type ClusterPoint = PointFeature<ClusterProps> | ClusterFeature<ClusterProps>;
@@ -221,6 +243,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           style={{ width: "100%", height: "100%" }}
           onMove={(evt) => setZoom(evt.viewState.zoom)}
           onClick={() => setSelectedEntity(null)}
+          onLoad={handleMapLoad}
         >
           {clusters.map((feature) => {
             const [lng, lat] = feature.geometry.coordinates;
@@ -268,6 +291,24 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
 
           <TreadwellMarker isSelected={selectedEntity?.type === "treadwell"} onClick={selectTreadwell} />
         </MapLibreMap>
+      )}
+
+      {view === "map" && (
+        <>
+          {/* Edge-only vignette -- like foxing/wear on old paper. Transparent
+              through the whole central viewing area, only darkens the outer
+              margin, so it never meaningfully dulls markers or controls. */}
+          <div
+            className="pointer-events-none absolute inset-0 z-[3]"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, transparent 60%, rgba(58,46,32,0.16) 100%)",
+            }}
+          />
+          <div className="pointer-events-none absolute bottom-3 left-3 z-[3] opacity-70">
+            <CompassRose size={76} />
+          </div>
+        </>
       )}
 
       {selectedEntity && (
