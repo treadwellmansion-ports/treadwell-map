@@ -2,6 +2,8 @@
 
 import { Marker } from "react-map-gl/maplibre";
 
+const LOGO_ASPECT = 1023 / 1380; // width / height of the source PNG
+
 export function ClusterMarker({
   longitude,
   latitude,
@@ -13,7 +15,9 @@ export function ClusterMarker({
   count: number;
   onClick: () => void;
 }) {
-  const size = Math.min(56, 34 + Math.log2(count) * 6);
+  const size = Math.min(60, 38 + Math.log2(count) * 6);
+  const logoHeight = size * 0.62;
+  const logoWidth = logoHeight * LOGO_ASPECT;
 
   return (
     <Marker longitude={longitude} latitude={latitude} anchor="center" style={{ zIndex: 5 }}>
@@ -24,16 +28,29 @@ export function ClusterMarker({
           onClick();
         }}
         aria-label={`${count} recommendations in this area`}
-        className="flex items-center justify-center rounded-full border-2 font-semibold text-white shadow-md transition-transform hover:scale-105"
-        style={{
-          width: size,
-          height: size,
-          backgroundColor: "#4A3B2A",
-          borderColor: "#F4E9D6",
-          fontSize: 13,
-        }}
+        className="relative flex items-center justify-center transition-transform hover:scale-105"
+        style={{ width: size, height: size }}
       >
-        {count}
+        <span
+          className="flex items-center justify-center rounded-full border-2 shadow-md"
+          style={{ width: size, height: size, backgroundColor: "#FBF6EA", borderColor: "#3A2E20" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/treadwell-logo.png"
+            alt=""
+            width={logoWidth}
+            height={logoHeight}
+            style={{ width: logoWidth, height: logoHeight }}
+            draggable={false}
+          />
+        </span>
+        <span
+          className="absolute -right-1 -top-1 flex items-center justify-center rounded-full border-2 border-[#FBF6EA] font-semibold text-white shadow-sm"
+          style={{ minWidth: 20, height: 20, padding: "0 4px", backgroundColor: "#A98235", fontSize: 11 }}
+        >
+          {count}
+        </span>
       </button>
     </Marker>
   );

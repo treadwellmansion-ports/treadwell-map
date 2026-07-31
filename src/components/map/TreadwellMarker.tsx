@@ -2,11 +2,9 @@
 
 import { Marker } from "react-map-gl/maplibre";
 import { TREADWELL_ORIGIN } from "@/lib/constants";
-import { StarIcon } from "./StarIcon";
 
-// Placeholder Treadwell "You Are Here" mark: a gold star-in-circle with a
-// simple building glyph. Swap for the real Treadwell brand mark asset when
-// one is provided (see plan's "Defaults" section).
+const LOGO_ASPECT = 1023 / 1380; // width / height of the source PNG
+
 export function TreadwellMarker({
   isSelected,
   onClick,
@@ -14,6 +12,9 @@ export function TreadwellMarker({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const height = 48;
+  const width = Math.round(height * LOGO_ASPECT);
+
   return (
     <Marker
       longitude={TREADWELL_ORIGIN.lng}
@@ -29,13 +30,20 @@ export function TreadwellMarker({
         }}
         aria-label="The Treadwell Mansion -- You Are Here"
         className="flex items-center justify-center transition-transform duration-150"
-        style={{ width: 52, height: 52, transform: `scale(${isSelected ? 1.15 : 1})` }}
+        style={{ width: width + 16, height: height + 16, transform: `scale(${isSelected ? 1.15 : 1})` }}
       >
         <span
-          className="flex items-center justify-center rounded-full border-2 border-[#3A2E20] bg-[#1B1408] shadow-lg"
-          style={{ width: 40, height: 40 }}
+          className="flex items-center justify-center rounded-lg bg-[#FBF6EA] p-1.5 shadow-lg ring-1 ring-black/10"
         >
-          <StarIcon color="#D9A93B" size={22} outlineWidth={1} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/treadwell-logo.png"
+            alt="The Treadwell Mansion"
+            width={width}
+            height={height}
+            style={{ width, height }}
+            draggable={false}
+          />
         </span>
       </button>
     </Marker>
