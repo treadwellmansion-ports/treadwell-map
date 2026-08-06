@@ -11,6 +11,7 @@ import { useMapConfig } from "@/hooks/useMapConfig";
 import { useCategoryStyles } from "@/hooks/useCategoryStyles";
 import { useFilters } from "@/hooks/useFilters";
 import { useIdleReset } from "@/hooks/useIdleReset";
+import { useScreensaver } from "@/hooks/useScreensaver";
 import { logEvent } from "@/lib/analytics";
 import { StarMarker } from "./StarMarker";
 import { TreadwellMarker } from "./TreadwellMarker";
@@ -21,6 +22,9 @@ import { SearchBar } from "./SearchBar";
 import { ListView } from "./ListView";
 import { DetailPanel, type SelectedEntity } from "./DetailPanel";
 import { CompassRose } from "./CompassRose";
+import { Screensaver } from "./Screensaver";
+
+const SCREENSAVER_TIMEOUT_MS = 5 * 60 * 1000;
 
 // Baked into the basemap itself (via a runtime background-pattern, not a
 // screen-space overlay) so it always sits under every marker -- a DOM
@@ -131,6 +135,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   }
 
   useIdleReset(resetToDefault, variant === "kiosk");
+  const screensaver = useScreensaver(variant === "kiosk", SCREENSAVER_TIMEOUT_MS);
 
   // Debounced so we log intent-to-search, not every keystroke.
   useEffect(() => {
@@ -328,6 +333,8 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           No recommendations yet -- add some from /admin.
         </div>
       )}
+
+      {screensaver.active && <Screensaver onDismiss={screensaver.dismiss} />}
     </div>
   );
 }
