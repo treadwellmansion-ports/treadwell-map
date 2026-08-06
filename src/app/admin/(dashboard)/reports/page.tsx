@@ -16,6 +16,7 @@ export default function ReportsPage() {
   const [reports, setReports] = useState<IssueReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [showResolved, setShowResolved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -46,8 +47,16 @@ export default function ReportsPage() {
   }, []);
 
   async function resolve(id: string) {
+    setError(null);
     const supabase = createClient();
-    await supabase.from("issue_reports").update({ status: "resolved" }).eq("id", id);
+    const { error: updateError } = await supabase
+      .from("issue_reports")
+      .update({ status: "resolved" })
+      .eq("id", id);
+    if (updateError) {
+      setError("Couldn't mark this resolved. Try again.");
+      return;
+    }
     load();
   }
 
@@ -68,6 +77,8 @@ export default function ReportsPage() {
         <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
         Show resolved
       </label>
+
+      {error && <p className="mt-3 text-sm font-medium text-red-700">{error}</p>}
 
       {loading ? (
         <p className="mt-6 text-sm text-neutral-500">Loading...</p>

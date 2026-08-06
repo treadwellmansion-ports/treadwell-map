@@ -20,6 +20,7 @@ function MapSettingsForm({ initial }: { initial: MapConfig }) {
   const [draft, setDraft] = useState<MapConfig>(initial);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function num(value: string) {
     return Number(value);
@@ -29,12 +30,17 @@ function MapSettingsForm({ initial }: { initial: MapConfig }) {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
-    await fetch("/api/map-config", {
+    setError(null);
+    const res = await fetch("/api/map-config", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(draft),
     });
     setSaving(false);
+    if (!res.ok) {
+      setError("Couldn't save settings. Try again.");
+      return;
+    }
     setSaved(true);
   }
 
@@ -176,6 +182,7 @@ function MapSettingsForm({ initial }: { initial: MapConfig }) {
           {saving ? "Saving..." : "Save settings"}
         </button>
         {saved && <span className="text-sm text-green-700">Saved.</span>}
+        {error && <span className="text-sm font-medium text-red-700">{error}</span>}
       </div>
     </form>
   );

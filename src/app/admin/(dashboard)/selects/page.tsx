@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useCategoryStyles } from "@/hooks/useCategoryStyles";
 import { SELECTS_CAP } from "@/lib/constants";
@@ -9,17 +10,23 @@ import { StarIcon } from "@/components/map/StarIcon";
 export default function SelectsAuditPage() {
   const { recommendations, loading, reload } = useRecommendations();
   const { categoryStyles } = useCategoryStyles();
+  const [error, setError] = useState<string | null>(null);
 
   const selects = recommendations
     .filter((r) => r.isSelect)
     .sort((a, b) => a.displayOrder - b.displayOrder);
 
   async function removeFromSelects(id: string) {
-    await fetch(`/api/recommendations/${id}`, {
+    setError(null);
+    const res = await fetch(`/api/recommendations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isSelect: false, selectNote: null }),
     });
+    if (!res.ok) {
+      setError("Couldn't remove this Select. Try again.");
+      return;
+    }
     reload();
   }
 
@@ -36,6 +43,8 @@ export default function SelectsAuditPage() {
       <p className="mt-1 text-sm text-neutral-500">
         Selects only mean something if they&apos;re scarce -- audit and prune here.
       </p>
+
+      {error && <p className="mt-3 text-sm font-medium text-red-700">{error}</p>}
 
       {loading ? (
         <p className="mt-6 text-sm text-neutral-500">Loading...</p>

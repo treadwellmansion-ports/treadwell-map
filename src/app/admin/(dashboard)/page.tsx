@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useCategoryStyles } from "@/hooks/useCategoryStyles";
 import { StarIcon } from "@/components/map/StarIcon";
@@ -33,15 +34,21 @@ function csvEscape(value: unknown): string {
 export default function AdminRecommendationsPage() {
   const { recommendations, loading, reload } = useRecommendations();
   const { categoryStyles } = useCategoryStyles();
+  const [error, setError] = useState<string | null>(null);
 
   const sorted = [...recommendations].sort((a, b) => a.displayOrder - b.displayOrder);
 
   async function togglePublished(id: string, published: boolean) {
-    await fetch(`/api/recommendations/${id}`, {
+    setError(null);
+    const res = await fetch(`/api/recommendations/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ published: !published }),
     });
+    if (!res.ok) {
+      setError("Couldn't update publish status. Try again.");
+      return;
+    }
     reload();
   }
 
@@ -80,6 +87,8 @@ export default function AdminRecommendationsPage() {
           </Link>
         </div>
       </div>
+
+      {error && <p className="mt-3 text-sm font-medium text-red-700">{error}</p>}
 
       {loading ? (
         <p className="mt-6 text-sm text-neutral-500">Loading...</p>
