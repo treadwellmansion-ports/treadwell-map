@@ -2,7 +2,7 @@
 
 import { Marker } from "react-map-gl/maplibre";
 
-const LOGO_ASPECT = 1023 / 1380; // width / height of the source PNG
+const MOTIF_ASPECT = 307 / 171; // width / height of the source PNG (wide flower motif)
 
 export function ClusterMarker({
   longitude,
@@ -16,8 +16,8 @@ export function ClusterMarker({
   onClick: () => void;
 }) {
   const size = Math.min(60, 38 + Math.log2(count) * 6);
-  const logoHeight = size * 0.62;
-  const logoWidth = logoHeight * LOGO_ASPECT;
+  const motifWidth = size * 0.72;
+  const motifHeight = motifWidth / MOTIF_ASPECT;
 
   return (
     <Marker longitude={longitude} latitude={latitude} anchor="center" style={{ zIndex: 5 }}>
@@ -37,11 +37,11 @@ export function ClusterMarker({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/brand/treadwell-logo.png"
+            src="/brand/treadwell-motif.png"
             alt=""
-            width={logoWidth}
-            height={logoHeight}
-            style={{ width: logoWidth, height: logoHeight }}
+            width={motifWidth}
+            height={motifHeight}
+            style={{ width: motifWidth, height: motifHeight }}
             draggable={false}
           />
         </span>
