@@ -8,7 +8,7 @@ export const TREADWELL_ORIGIN = {
   lng: -70.7568112,
 } as const;
 
-export const SELECTS_CAP = 10;
+export const SELECTS_CAP = 25;
 
 // Forked from OpenFreeMap's "Liberty" style (checked into public/map-styles/)
 // and recolored toward the spec's antique-chart parchment palette -- flat
