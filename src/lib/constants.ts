@@ -37,11 +37,11 @@ export const DEFAULT_MAP_CONFIG = {
   centerLat: 43.076,
   centerLng: -70.757,
   zoom: 16,
-  minZoom: 13,
+  minZoom: 11,
   maxZoom: 19,
   maxBounds: [
-    [-70.787, 43.068],
-    [-70.734, 43.088],
+    [-70.787, 42.981],
+    [-70.705, 43.088],
   ] as [[number, number], [number, number]],
   styleUrl: null as string | null,
 };
