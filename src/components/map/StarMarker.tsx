@@ -2,8 +2,29 @@
 
 import { Marker } from "react-map-gl/maplibre";
 import type { Recommendation } from "@/lib/types";
-import { SELECT_RING_COLOR } from "@/lib/constants";
-import { StarIcon } from "./StarIcon";
+import { SELECT_RING_COLOR, STAR_OUTLINE_COLOR } from "@/lib/constants";
+
+const RING_COLOR = `var(--gold, ${SELECT_RING_COLOR})`;
+import { CategoryIcon } from "./CategoryIcon";
+
+// Selection stamp: a one-shot ink-bleed ring (radial-gradient ink fading to
+// transparent) that scales past the marker, plus a persistent gold ring
+// while selected. Defined once in the module scope, injected on first
+// render (see StarMarker.tsx's sibling GuestMap.tsx for the map/list page
+// -turn transition, which lives in globals.css instead since it's shared).
+const STAMP_STYLE_ID = "marker-stamp-keyframes";
+function ensureStampKeyframes() {
+  if (typeof document === "undefined" || document.getElementById(STAMP_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = STAMP_STYLE_ID;
+  style.textContent = `
+    @keyframes marker-ink-bleed {
+      0% { transform: scale(0.5); opacity: 0.45; }
+      100% { transform: scale(2.3); opacity: 0; }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 export function StarMarker({
   recommendation,
@@ -16,10 +37,13 @@ export function StarMarker({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const baseSize = 22;
-  const size = recommendation.isSelect ? Math.round(baseSize * 1.15) : baseSize;
+  ensureStampKeyframes();
+
+  const baseSize = 36;
+  const pinSize = recommendation.isSelect ? Math.round(baseSize * 1.15) : baseSize;
+  const iconSize = Math.round(pinSize * 0.56);
   const scale = isSelected ? 1.35 : 1;
-  // Selects render above standard stars, below the Treadwell marker (z-index 30).
+  // Selects render above standard pins, below the Treadwell marker (z-index 30).
   const zIndex = recommendation.isSelect ? 20 : 10;
 
   return (
@@ -36,23 +60,40 @@ export function StarMarker({
           onClick();
         }}
         aria-label={recommendation.name}
-        className="flex items-center justify-center rounded-full transition-transform duration-150"
+        className="group relative flex items-center justify-center transition-transform duration-150 ease-[cubic-bezier(.34,1.56,.64,1)] hover:scale-[1.12]"
         style={{
           width: 44,
           height: 44,
           transform: `scale(${scale})`,
         }}
       >
+        {isSelected && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute rounded-full"
+            style={{
+              width: pinSize,
+              height: pinSize,
+              backgroundColor: color,
+              animation: "marker-ink-bleed 420ms ease-out",
+            }}
+          />
+        )}
         <span
-          className="flex items-center justify-center rounded-full"
+          className="relative flex items-center justify-center rounded-full shadow-md"
           style={{
-            width: size + (recommendation.isSelect ? 10 : 0),
-            height: size + (recommendation.isSelect ? 10 : 0),
-            boxShadow: recommendation.isSelect ? `0 0 0 2.5px ${SELECT_RING_COLOR}` : undefined,
-            backgroundColor: isSelected ? "rgba(255,255,255,0.35)" : "transparent",
+            width: pinSize,
+            height: pinSize,
+            backgroundColor: color,
+            boxShadow: recommendation.isSelect
+              ? `0 0 0 2.5px ${RING_COLOR}, 0 1px 3px rgba(27,20,8,.35)`
+              : isSelected
+                ? `0 0 0 2px ${RING_COLOR}, 0 1px 3px rgba(27,20,8,.35)`
+                : "0 1px 3px rgba(27,20,8,.35)",
+            border: `1px solid ${STAR_OUTLINE_COLOR}55`,
           }}
         >
-          <StarIcon color={color} size={size} />
+          <CategoryIcon category={recommendation.category} size={iconSize} />
         </span>
       </button>
     </Marker>

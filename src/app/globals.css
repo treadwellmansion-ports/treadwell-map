@@ -45,3 +45,75 @@ body {
     transform: scale(1.03);
   }
 }
+
+/* Map<->list "page-turn" transition (src/components/map/GuestMap.tsx) --
+   a book-page feel (rotateY + perspective) instead of a generic slide/fade,
+   played as an entrance animation on whichever view just mounted. */
+@keyframes page-turn-in-list {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes page-turn-in-map {
+  from {
+    opacity: 0;
+    transform: perspective(1200px) rotateY(-6deg) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1200px) rotateY(0deg) scale(1);
+  }
+}
+
+.animate-page-turn-in-list {
+  transform-origin: left center;
+  animation: page-turn-in-list 380ms cubic-bezier(0.65, 0, 0.35, 1) 100ms both;
+}
+
+.animate-page-turn-in-map {
+  transform-origin: left center;
+  animation: page-turn-in-map 480ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+/* Compass loading state (src/components/map/CompassLoader.tsx) -- an idle
+   searching wobble while tiles load, settling to true north once ready,
+   instead of a generic spinner. */
+@keyframes compass-idle-wobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes compass-settle {
+  0% {
+    transform: rotate(-38deg);
+  }
+  18% {
+    transform: rotate(22deg);
+  }
+  36% {
+    transform: rotate(-12deg);
+  }
+  54% {
+    transform: rotate(6deg);
+  }
+  70% {
+    transform: rotate(-3deg);
+  }
+  85% {
+    transform: rotate(1deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}

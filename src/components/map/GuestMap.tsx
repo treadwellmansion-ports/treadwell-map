@@ -1,11 +1,13 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import MapLibreMap, { type MapEvent, type MapRef } from "react-map-gl/maplibre";
 import Supercluster, { type ClusterFeature, type PointFeature } from "supercluster";
 import type { Recommendation } from "@/lib/types";
 import { DEFAULT_MAP_STYLE_URL, TREADWELL_ORIGIN } from "@/lib/constants";
+import { getSeasonalPalette } from "@/lib/seasonalPalette";
+import { applyLamplightColors, LAMPLIGHT_PALETTE, useLamplight } from "@/lib/lamplight";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useMapConfig } from "@/hooks/useMapConfig";
 import { useCategoryStyles } from "@/hooks/useCategoryStyles";
@@ -22,6 +24,7 @@ import { SearchBar } from "./SearchBar";
 import { ListView } from "./ListView";
 import { DetailPanel, type SelectedEntity } from "./DetailPanel";
 import { CompassRose } from "./CompassRose";
+import { CompassLoader } from "./CompassLoader";
 import { Screensaver } from "./Screensaver";
 
 const SCREENSAVER_TIMEOUT_MS = 5 * 60 * 1000;
@@ -29,15 +32,23 @@ const SCREENSAVER_TIMEOUT_MS = 5 * 60 * 1000;
 // Baked into the basemap itself (via a runtime background-pattern, not a
 // screen-space overlay) so it always sits under every marker -- a DOM
 // overlay would sit above the marker layer and dull the stars.
-function handleMapLoad(e: MapEvent) {
+// The pattern paints opaque over whatever background-color is set beneath
+// it, so it's skipped in lamplight mode (a flat dark umber wash) rather
+// than masking the dark tint with the light parchment-noise texture.
+function handleMapLoad(e: MapEvent, applyPattern: boolean) {
   const map = e.target;
-  if (map.hasImage("paper-grain")) return;
+  if (map.hasImage("paper-grain")) {
+    if (map.getLayer("background")) {
+      map.setPaintProperty("background", "background-pattern", applyPattern ? "paper-grain" : null);
+    }
+    return;
+  }
   map
     .loadImage("/map-styles/paper-grain.png")
     .then(({ data: image }) => {
       if (!image || map.hasImage("paper-grain")) return;
       map.addImage("paper-grain", image);
-      if (map.getLayer("background")) {
+      if (applyPattern && map.getLayer("background")) {
         map.setPaintProperty("background", "background-pattern", "paper-grain");
       }
     })
@@ -55,11 +66,20 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   const { mapConfig } = useMapConfig();
   const { categoryStyles } = useCategoryStyles();
   const filters = useFilters(recommendations);
+  const isLamplight = useLamplight();
+  const effectiveCategoryStyles = useMemo(
+    () => (isLamplight ? applyLamplightColors(categoryStyles) : categoryStyles),
+    [categoryStyles, isLamplight]
+  );
 
   const mapRef = useRef<MapRef | null>(null);
   const [zoom, setZoom] = useState(mapConfig.zoom);
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [view, setView] = useState<"map" | "list">("map");
+  const [loaderPhase, setLoaderPhase] = useState<"idle" | "settling" | "done">("idle");
+  // Computed once per mount, not re-checked mid-session -- a guest's visit
+  // won't cross a season boundary, so there's no need to watch the clock.
+  const seasonal = useMemo(() => getSeasonalPalette(), []);
 
   const standardFiltered = useMemo(
     () => filters.filtered.filter((r) => !r.isSelect),
@@ -155,6 +175,32 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     flyTo(TREADWELL_ORIGIN.lat, TREADWELL_ORIGIN.lng, Math.max(mapConfig.zoom, 17));
   }
 
+  // Compass-settle loading state: idle wobble while the style/tiles load,
+  // then a one-shot settle-to-north once ready, instead of a blank gap.
+  // Guarded so a second `load` event (react-map-gl re-fires onLoad when the
+  // prop identity changes on an already-loaded map) can't restart the timer.
+  function onMapLoad(e: MapEvent) {
+    handleMapLoad(e, !isLamplight);
+    if (e.target.getLayer("background")) {
+      const bg = isLamplight ? LAMPLIGHT_PALETTE.bg : seasonal?.bg;
+      if (bg) e.target.setPaintProperty("background", "background-color", bg);
+    }
+    setLoaderPhase((prev) => (prev === "idle" ? "settling" : prev));
+    setTimeout(() => setLoaderPhase((prev) => (prev === "settling" ? "done" : prev)), 1900);
+  }
+
+  // Lamplight can flip live during a long kiosk session (re-checked every 5
+  // min, see useLamplight) -- re-paint the already-loaded map's background
+  // rather than waiting for a reload. MapLibre cross-fades paint property
+  // changes by default, giving the spec's dusk transition "for free".
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map || !map.isStyleLoaded() || !map.getLayer("background")) return;
+    const bg = isLamplight ? LAMPLIGHT_PALETTE.bg : seasonal?.bg;
+    if (bg) map.setPaintProperty("background", "background-color", bg);
+    map.setPaintProperty("background", "background-pattern", isLamplight ? null : "paper-grain");
+  }, [isLamplight, seasonal]);
+
   const sameCategorySorted = useMemo(() => {
     if (selectedEntity?.type !== "recommendation") return [];
     return recommendations
@@ -170,7 +216,23 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   const hasNext = currentIndex >= 0 && currentIndex < sameCategorySorted.length - 1;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#8FB0AE]">
+    <div
+      className="relative h-full w-full overflow-hidden bg-[#8FB0AE]"
+      style={
+        {
+          "--seasonal-card": isLamplight ? LAMPLIGHT_PALETTE.card : (seasonal?.card ?? "#FBF6EA"),
+          "--seasonal-deep-tan": isLamplight ? LAMPLIGHT_PALETTE.border : (seasonal?.deepTan ?? "#B9A47B"),
+          "--ink": isLamplight ? LAMPLIGHT_PALETTE.ink : "#1B1408",
+          "--ink-secondary": isLamplight ? "#C9B893" : "#4A3B2A",
+          "--border": isLamplight ? LAMPLIGHT_PALETTE.border : "rgba(0,0,0,0.1)",
+          "--gold": isLamplight ? LAMPLIGHT_PALETTE.gold : "#A98235",
+          "--cta-bg": isLamplight ? LAMPLIGHT_PALETTE.gold : "#1B1408",
+          "--cta-text": isLamplight ? LAMPLIGHT_PALETTE.bg : "#F4E9D6",
+          "--row-bg": isLamplight ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.7)",
+          "--row-bg-hover": isLamplight ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,1)",
+        } as CSSProperties
+      }
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3">
         <div className="pointer-events-auto rounded-full bg-white/95 px-4 py-2 text-sm font-semibold tracking-wide text-[#1B1408] shadow-md">
           The Treadwell Mansion
@@ -202,7 +264,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           <div className="flex flex-col gap-3">
             <SearchBar value={filters.query} onChange={filters.setQuery} />
             <Legend
-              categoryStyles={categoryStyles}
+              categoryStyles={effectiveCategoryStyles}
               selectedCategories={filters.selectedCategories}
               selectsOnly={filters.selectsOnly}
               filteredCount={filters.filtered.length}
@@ -217,11 +279,14 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
       )}
 
       {view === "list" ? (
-        <div className="absolute inset-0 z-10 overflow-y-auto bg-[#FBF6EA] pt-16">
+        <div
+          key="list"
+          className="animate-page-turn-in-list absolute inset-0 z-10 overflow-y-auto bg-[var(--seasonal-card)] pt-16 transition-colors duration-[600ms]"
+        >
           <div className="flex flex-col gap-3 border-b border-black/5 p-3">
             <SearchBar value={filters.query} onChange={filters.setQuery} />
             <Legend
-              categoryStyles={categoryStyles}
+              categoryStyles={effectiveCategoryStyles}
               selectedCategories={filters.selectedCategories}
               selectsOnly={filters.selectsOnly}
               filteredCount={filters.filtered.length}
@@ -231,9 +296,10 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               onShowAll={filters.showAll}
             />
           </div>
-          <ListView recommendations={filters.filtered} categoryStyles={categoryStyles} onSelect={selectRecommendation} />
+          <ListView recommendations={filters.filtered} categoryStyles={effectiveCategoryStyles} onSelect={selectRecommendation} />
         </div>
       ) : (
+        <div key="map" className="animate-page-turn-in-map absolute inset-0">
         <MapLibreMap
           ref={mapRef}
           initialViewState={{
@@ -248,7 +314,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           style={{ width: "100%", height: "100%" }}
           onMove={(evt) => setZoom(evt.viewState.zoom)}
           onClick={() => setSelectedEntity(null)}
-          onLoad={handleMapLoad}
+          onLoad={onMapLoad}
         >
           {clusters.map((feature) => {
             const [lng, lat] = feature.geometry.coordinates;
@@ -277,7 +343,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               <StarMarker
                 key={recommendation.id}
                 recommendation={recommendation}
-                color={categoryStyles[recommendation.category].color}
+                color={effectiveCategoryStyles[recommendation.category].color}
                 isSelected={selectedEntity?.type === "recommendation" && selectedEntity.data.id === recommendation.id}
                 onClick={() => selectRecommendation(recommendation)}
               />
@@ -288,7 +354,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
             <StarMarker
               key={r.id}
               recommendation={r}
-              color={categoryStyles[r.category].color}
+              color={effectiveCategoryStyles[r.category].color}
               isSelected={selectedEntity?.type === "recommendation" && selectedEntity.data.id === r.id}
               onClick={() => selectRecommendation(r)}
             />
@@ -296,6 +362,8 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
 
           <TreadwellMarker isSelected={selectedEntity?.type === "treadwell"} onClick={selectTreadwell} />
         </MapLibreMap>
+        {loaderPhase !== "done" && <CompassLoader phase={loaderPhase === "idle" ? "idle" : "settling"} />}
+        </div>
       )}
 
       {view === "map" && (
@@ -319,7 +387,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
       {selectedEntity && (
         <DetailPanel
           entity={selectedEntity}
-          categoryStyles={categoryStyles}
+          categoryStyles={effectiveCategoryStyles}
           onClose={() => setSelectedEntity(null)}
           onPrev={() => hasPrev && selectRecommendation(sameCategorySorted[currentIndex - 1])}
           onNext={() => hasNext && selectRecommendation(sameCategorySorted[currentIndex + 1])}
