@@ -14,6 +14,7 @@ import { useCategoryStyles } from "@/hooks/useCategoryStyles";
 import { useFilters } from "@/hooks/useFilters";
 import { useIdleReset } from "@/hooks/useIdleReset";
 import { useScreensaver } from "@/hooks/useScreensaver";
+import { useCart } from "@/hooks/useCart";
 import { logEvent } from "@/lib/analytics";
 import { StarMarker } from "./StarMarker";
 import { TreadwellMarker } from "./TreadwellMarker";
@@ -26,6 +27,8 @@ import { DetailPanel, type SelectedEntity } from "./DetailPanel";
 import { CompassRose } from "./CompassRose";
 import { CompassLoader } from "./CompassLoader";
 import { Screensaver } from "./Screensaver";
+import { CartButton } from "./CartButton";
+import { CartDrawer } from "./CartDrawer";
 
 const SCREENSAVER_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -77,6 +80,8 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity | null>(null);
   const [view, setView] = useState<"map" | "list">("map");
   const [loaderPhase, setLoaderPhase] = useState<"idle" | "settling" | "done">("idle");
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const cart = useCart();
   // Computed once per mount, not re-checked mid-session -- a guest's visit
   // won't cross a season boundary, so there's no need to watch the clock.
   const seasonal = useMemo(() => getSeasonalPalette(), []);
@@ -147,6 +152,8 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     setSelectedEntity(null);
     setView("map");
     filters.showAll();
+    cart.clearCart();
+    setIsCartOpen(false);
     mapRef.current?.flyTo({
       center: [TREADWELL_ORIGIN.lng, TREADWELL_ORIGIN.lat],
       zoom: Math.max(mapConfig.zoom, 17),
@@ -256,6 +263,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               List
             </button>
           </div>
+          <CartButton count={cart.count} onClick={() => setIsCartOpen(true)} />
         </div>
       </div>
 
@@ -393,6 +401,12 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           onNext={() => hasNext && selectRecommendation(sameCategorySorted[currentIndex + 1])}
           hasPrev={hasPrev}
           hasNext={hasNext}
+          isInCart={selectedEntity.type === "recommendation" ? cart.isInCart(selectedEntity.data.id) : false}
+          onToggleCart={
+            selectedEntity.type === "recommendation"
+              ? () => cart.toggleCart(selectedEntity.data.id)
+              : undefined
+          }
         />
       )}
 
@@ -400,6 +414,19 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
         <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-white/95 px-4 py-2 text-xs text-neutral-600 shadow-md">
           No recommendations yet -- add some from /admin.
         </div>
+      )}
+
+      {isCartOpen && (
+        <CartDrawer
+          recommendations={recommendations.filter((r) => cart.cartIds.has(r.id))}
+          categoryStyles={effectiveCategoryStyles}
+          onRemove={cart.removeFromCart}
+          onClose={() => setIsCartOpen(false)}
+          onSent={() => {
+            cart.clearCart();
+            setIsCartOpen(false);
+          }}
+        />
       )}
 
       {screensaver.active && <Screensaver onDismiss={screensaver.dismiss} />}

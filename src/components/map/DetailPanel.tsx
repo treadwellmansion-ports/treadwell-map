@@ -24,6 +24,8 @@ export function DetailPanel({
   onNext,
   hasPrev,
   hasNext,
+  isInCart,
+  onToggleCart,
 }: {
   entity: SelectedEntity;
   categoryStyles: CategoryStyleMap;
@@ -32,6 +34,8 @@ export function DetailPanel({
   onNext: () => void;
   hasPrev: boolean;
   hasNext: boolean;
+  isInCart?: boolean;
+  onToggleCart?: () => void;
 }) {
   const isLandscape = useMediaQuery("(orientation: landscape)");
   const [largeText, setLargeText] = useState(false);
@@ -84,6 +88,8 @@ export function DetailPanel({
             hasPrev={hasPrev}
             hasNext={hasNext}
             largeText={largeText}
+            isInCart={isInCart ?? false}
+            onToggleCart={onToggleCart}
           />
         )}
       </div>
@@ -109,6 +115,8 @@ function RecommendationContent({
   hasPrev,
   hasNext,
   largeText,
+  isInCart,
+  onToggleCart,
 }: {
   recommendation: Recommendation;
   categoryStyles: CategoryStyleMap;
@@ -117,6 +125,8 @@ function RecommendationContent({
   hasPrev: boolean;
   hasNext: boolean;
   largeText: boolean;
+  isInCart: boolean;
+  onToggleCart?: () => void;
 }) {
   const style = categoryStyles[recommendation.category];
   const walking = formatWalkingInfo(
@@ -238,15 +248,33 @@ function RecommendationContent({
         )}
       </dl>
 
-      <a
-        href={directionsUrl(recommendation.lat, recommendation.lng)}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-5 flex items-center justify-center rounded-full bg-[var(--cta-bg)] px-4 text-sm font-semibold text-[var(--cta-text)] transition-colors duration-[600ms] hover:opacity-90"
-        style={{ minHeight: largeText ? 48 : 44 }}
-      >
-        Get Directions
-      </a>
+      <div className="mt-5 flex gap-2">
+        <a
+          href={directionsUrl(recommendation.lat, recommendation.lng)}
+          target="_blank"
+          rel="noreferrer"
+          className="flex flex-1 items-center justify-center rounded-full bg-[var(--cta-bg)] px-4 text-sm font-semibold text-[var(--cta-text)] transition-colors duration-[600ms] hover:opacity-90"
+          style={{ minHeight: largeText ? 48 : 44 }}
+        >
+          Get Directions
+        </a>
+        {onToggleCart && (
+          <button
+            type="button"
+            onClick={onToggleCart}
+            aria-pressed={isInCart}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-full border px-4 text-sm font-semibold transition-colors"
+            style={{
+              minHeight: largeText ? 48 : 44,
+              borderColor: "var(--gold)",
+              backgroundColor: isInCart ? "var(--gold)" : "transparent",
+              color: isInCart ? "#fff" : "var(--ink-secondary)",
+            }}
+          >
+            {isInCart ? "✓ On Your List" : "+ Add to List"}
+          </button>
+        )}
+      </div>
 
       <div className="mt-4 flex items-center justify-between">
         <button
