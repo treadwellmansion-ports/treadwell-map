@@ -11,6 +11,12 @@ create table cart_submissions (
   guest_email text not null,
   guest_name text,
   delivery_method text not null default 'email' check (delivery_method in ('email', 'sms')),
+  -- Every email a guest enters gets logged here regardless of whether the
+  -- Resend send itself succeeded (e.g. blocked by Resend's unverified-domain
+  -- test-mode restriction) -- staff still want the contact captured so no
+  -- guest is lost to a delivery hiccup.
+  status text not null default 'sent' check (status in ('sent', 'failed')),
+  failure_reason text,
   recommendation_ids uuid[] not null,
   -- Names/addresses at time of send, kept even if a recommendation is later
   -- edited or deleted, so old submissions stay accurate historical records.
@@ -19,6 +25,7 @@ create table cart_submissions (
 );
 
 create index cart_submissions_created_at_idx on cart_submissions(created_at);
+create index cart_submissions_status_idx on cart_submissions(status);
 
 alter table cart_submissions enable row level security;
 

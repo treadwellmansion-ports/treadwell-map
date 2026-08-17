@@ -37,31 +37,40 @@ export async function POST(request: NextRequest) {
 
   const recommendations: CartRecommendation[] = rows;
 
+  let guestSent = false;
+  let guestError: string | null = null;
   try {
-    const { guestSent } = await sendCartEmails({
+    const result = await sendCartEmails({
       guestEmail: email,
       guestName: name,
       deliveryMethod: "email",
       recommendations,
     });
-
-    if (!guestSent) return serverError("Couldn't send your list -- please try again in a moment");
-
-    const { error: logError } = await supabase.from("cart_submissions").insert({
-      guest_email: email,
-      guest_name: name,
-      delivery_method: "email",
-      recommendation_ids: recommendations.map((r) => r.id),
-      recommendation_snapshot: recommendations.map((r) => ({
-        id: r.id,
-        name: r.name,
-        address: r.address,
-      })),
-    });
-    if (logError) console.error("cart_submissions log failed:", logError.message);
-
-    return NextResponse.json({ ok: true });
+    guestSent = result.guestSent;
+    guestError = result.guestError;
   } catch (err) {
-    return serverError(err instanceof Error ? err.message : "Failed to send your list");
+    guestError = err instanceof Error ? err.message : "Failed to send your list";
   }
+
+  // Log every email a guest enters -- whether or not the send itself
+  // succeeded -- so no contact is lost to a delivery hiccup (e.g. Resend's
+  // unverified-domain test-mode restriction blocking sends to non-owner
+  // addresses). Staff can follow up manually on anything marked "failed".
+  const { error: logError } = await supabase.from("cart_submissions").insert({
+    guest_email: email,
+    guest_name: name,
+    delivery_method: "email",
+    status: guestSent ? "sent" : "failed",
+    failure_reason: guestError,
+    recommendation_ids: recommendations.map((r) => r.id),
+    recommendation_snapshot: recommendations.map((r) => ({
+      id: r.id,
+      name: r.name,
+      address: r.address,
+    })),
+  });
+  if (logError) console.error("cart_submissions log failed:", logError.message);
+
+  if (!guestSent) return serverError("Couldn't send your list -- please try again in a moment");
+  return NextResponse.json({ ok: true });
 }

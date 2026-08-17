@@ -60,7 +60,7 @@ export async function sendCartEmails({
   guestName: string | null;
   deliveryMethod: "email" | "sms";
   recommendations: CartRecommendation[];
-}): Promise<{ guestSent: boolean; ownerSent: boolean }> {
+}): Promise<{ guestSent: boolean; guestError: string | null; ownerSent: boolean }> {
   const resend = getResendClient();
   if (!resend) {
     throw new Error("Email sending isn't configured yet -- ask the front desk to set up RESEND_API_KEY.");
@@ -118,5 +118,9 @@ export async function sendCartEmails({
     ownerSent = !ownerError;
   }
 
-  return { guestSent: !guestError, ownerSent };
+  return {
+    guestSent: !guestError,
+    guestError: guestError ? (guestError.message ?? "Email delivery failed") : null,
+    ownerSent,
+  };
 }
