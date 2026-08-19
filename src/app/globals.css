@@ -117,3 +117,24 @@ body {
     transform: rotate(0deg);
   }
 }
+
+/* Always-visible horizontal scrollbar for the DetailPanel photo strip --
+   default OS/touch scrollbars stay hidden until actively scrolling, giving
+   guests no hint that a listing has more than one photo. */
+.photo-strip-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold, #a98235) transparent;
+}
+
+.photo-strip-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.photo-strip-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.photo-strip-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--gold, #a98235);
+  border-radius: 999px;
+}

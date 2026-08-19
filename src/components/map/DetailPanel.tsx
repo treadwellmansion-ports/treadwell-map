@@ -180,7 +180,7 @@ function RecommendationContent({
       )}
 
       {recommendation.photos.length > 0 && (
-        <div className="mt-4 flex gap-2 overflow-x-auto">
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-2 photo-strip-scroll">
           {recommendation.photos.map((src) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
