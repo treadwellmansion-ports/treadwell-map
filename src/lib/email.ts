@@ -5,6 +5,7 @@ import { TREADWELL_ORIGIN } from "./constants";
 export type CartRecommendation = Pick<Recommendation, "id" | "name" | "address" | "phone">;
 
 const FROM = process.env.CART_FROM_EMAIL || "onboarding@resend.dev";
+const FROM_DISPLAY = `The Treadwell Mansion <${FROM}>`;
 const NOTIFICATION_EMAIL = process.env.CART_NOTIFICATION_EMAIL;
 
 function getResendClient() {
@@ -85,8 +86,9 @@ export async function sendCartEmails({
   );
 
   const { error: guestError } = await resend.emails.send({
-    from: FROM,
+    from: FROM_DISPLAY,
     to: guestEmail,
+    replyTo: NOTIFICATION_EMAIL || undefined,
     subject: "Your Treadwell Mansion picks",
     html: guestHtml,
   });
@@ -110,7 +112,7 @@ export async function sendCartEmails({
     );
 
     const { error: ownerError } = await resend.emails.send({
-      from: FROM,
+      from: FROM_DISPLAY,
       to: NOTIFICATION_EMAIL,
       subject: `Guest cart: ${recommendations.length} pick${recommendations.length === 1 ? "" : "s"} sent via ${deliveryMethod}`,
       html: ownerHtml,
