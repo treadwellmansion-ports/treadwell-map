@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { CategoryStyleMap, Recommendation } from "@/lib/types";
 import { TREADWELL_ORIGIN } from "@/lib/constants";
 import { formatWalkingInfo } from "@/lib/geo/directions";
@@ -134,6 +134,31 @@ function RecommendationContent({
     recommendation.walkingTimeMinutes
   );
 
+  const photoStripRef = useRef<HTMLDivElement>(null);
+  const photoDrag = useRef<{ startX: number; startScrollLeft: number } | null>(null);
+  const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
+
+  function handlePhotoPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") return; // touch already scrolls natively
+    const el = photoStripRef.current;
+    if (!el) return;
+    photoDrag.current = { startX: e.clientX, startScrollLeft: el.scrollLeft };
+    setIsDraggingPhotos(true);
+    el.setPointerCapture(e.pointerId);
+  }
+
+  function handlePhotoPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!photoDrag.current) return;
+    const el = photoStripRef.current;
+    if (!el) return;
+    el.scrollLeft = photoDrag.current.startScrollLeft - (e.clientX - photoDrag.current.startX);
+  }
+
+  function endPhotoDrag() {
+    photoDrag.current = null;
+    setIsDraggingPhotos(false);
+  }
+
   return (
     <div>
       <div className="flex items-start justify-between gap-3">
@@ -180,14 +205,25 @@ function RecommendationContent({
       )}
 
       {recommendation.photos.length > 0 && (
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-2 photo-strip-scroll">
+        <div
+          ref={photoStripRef}
+          className={`mt-4 flex gap-2 overflow-x-auto pb-2 photo-strip-scroll ${
+            isDraggingPhotos ? "cursor-grabbing" : "cursor-grab"
+          }`}
+          onPointerDown={handlePhotoPointerDown}
+          onPointerMove={handlePhotoPointerMove}
+          onPointerUp={endPhotoDrag}
+          onPointerLeave={endPhotoDrag}
+          onPointerCancel={endPhotoDrag}
+        >
           {recommendation.photos.map((src) => (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               key={src}
               src={src}
               alt={recommendation.name}
-              className="h-32 w-44 shrink-0 rounded-lg object-cover"
+              draggable={false}
+              className="h-32 w-44 shrink-0 select-none rounded-lg object-cover"
             />
           ))}
         </div>
