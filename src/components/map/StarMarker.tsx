@@ -26,6 +26,20 @@ function ensureStampKeyframes() {
   document.head.appendChild(style);
 }
 
+// Five-point star outline (points up), alternating outer/inner vertices --
+// used as the Treadwell Selects badge shape so Selects read as distinct
+// from standard pins at a glance, not just a gold ring around a circle.
+function starPoints(cx: number, cy: number, outerR: number, innerR: number) {
+  const step = Math.PI / 5;
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const angle = -Math.PI / 2 + i * step;
+    pts.push(`${(cx + r * Math.cos(angle)).toFixed(2)},${(cy + r * Math.sin(angle)).toFixed(2)}`);
+  }
+  return pts.join(" ");
+}
+
 export function StarMarker({
   recommendation,
   color,
@@ -40,8 +54,8 @@ export function StarMarker({
   ensureStampKeyframes();
 
   const baseSize = 36;
-  const pinSize = recommendation.isSelect ? Math.round(baseSize * 1.15) : baseSize;
-  const iconSize = Math.round(pinSize * 0.56);
+  const pinSize = recommendation.isSelect ? Math.round(baseSize * 1.3) : baseSize;
+  const iconSize = Math.round(pinSize * (recommendation.isSelect ? 0.42 : 0.56));
   const scale = isSelected ? 1.35 : 1;
   // Selects render above standard pins, below the Treadwell marker (z-index 30).
   const zIndex = recommendation.isSelect ? 20 : 10;
@@ -79,22 +93,50 @@ export function StarMarker({
             }}
           />
         )}
-        <span
-          className="relative flex items-center justify-center rounded-full shadow-md"
-          style={{
-            width: pinSize,
-            height: pinSize,
-            backgroundColor: color,
-            boxShadow: recommendation.isSelect
-              ? `0 0 0 2.5px ${RING_COLOR}, 0 1px 3px rgba(27,20,8,.35)`
-              : isSelected
+        {recommendation.isSelect ? (
+          <span
+            className="relative flex items-center justify-center"
+            style={{
+              width: pinSize,
+              height: pinSize,
+              filter: "drop-shadow(0 1px 3px rgba(27,20,8,.4))",
+            }}
+          >
+            <svg
+              width={pinSize}
+              height={pinSize}
+              viewBox={`0 0 ${pinSize} ${pinSize}`}
+              className="absolute inset-0"
+              aria-hidden="true"
+            >
+              <polygon
+                points={starPoints(pinSize / 2, pinSize / 2, pinSize / 2 - 1.5, (pinSize / 2) * 0.5)}
+                fill={color}
+                stroke={RING_COLOR}
+                strokeWidth={2.5}
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="relative">
+              <CategoryIcon category={recommendation.category} size={iconSize} />
+            </span>
+          </span>
+        ) : (
+          <span
+            className="relative flex items-center justify-center rounded-full shadow-md"
+            style={{
+              width: pinSize,
+              height: pinSize,
+              backgroundColor: color,
+              boxShadow: isSelected
                 ? `0 0 0 2px ${RING_COLOR}, 0 1px 3px rgba(27,20,8,.35)`
                 : "0 1px 3px rgba(27,20,8,.35)",
-            border: `1px solid ${STAR_OUTLINE_COLOR}55`,
-          }}
-        >
-          <CategoryIcon category={recommendation.category} size={iconSize} />
-        </span>
+              border: `1px solid ${STAR_OUTLINE_COLOR}55`,
+            }}
+          >
+            <CategoryIcon category={recommendation.category} size={iconSize} />
+          </span>
+        )}
       </button>
     </Marker>
   );
