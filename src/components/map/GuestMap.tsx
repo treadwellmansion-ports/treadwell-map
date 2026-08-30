@@ -279,11 +279,8 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
       }
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3">
-        <div className="flex flex-col items-start gap-2">
-          <div className="pointer-events-auto rounded-full bg-white/95 px-4 py-2 text-sm font-semibold tracking-wide text-[#1B1408] shadow-md">
-            The Treadwell Mansion
-          </div>
-          <WeatherBadge weather={weather} />
+        <div className="pointer-events-auto rounded-full bg-white/95 px-4 py-2 text-sm font-semibold tracking-wide text-[#1B1408] shadow-md">
+          The Treadwell Mansion
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           <div className="flex overflow-hidden rounded-full bg-white/95 text-sm font-medium shadow-md ring-1 ring-black/10">
@@ -324,6 +321,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               onSetMaxWalkMinutes={filters.setMaxWalkMinutes}
               onShowAll={filters.showAll}
             />
+            <WeatherBadge weather={weather} />
           </div>
           <MapControls onReturnDowntown={returnToDowntown} onReturnTreadwell={returnToTreadwell} />
         </div>
@@ -348,6 +346,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               onSetMaxWalkMinutes={filters.setMaxWalkMinutes}
               onShowAll={filters.showAll}
             />
+            <WeatherBadge weather={weather} />
           </div>
           <ListView
             recommendations={filters.filtered}
