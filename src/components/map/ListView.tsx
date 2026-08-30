@@ -1,23 +1,30 @@
 "use client";
 
 import type { CategoryStyleMap, Recommendation } from "@/lib/types";
+import { POPULAR_BADGE_COLOR } from "@/lib/constants";
 import { CategoryIcon } from "./CategoryIcon";
+
+// Closest first; recommendations with no computed walking time (a data gap,
+// not "far away") sort to the end rather than the front.
+function byDistance(a: Recommendation, b: Recommendation) {
+  const da = a.walkingDistanceMeters ?? Infinity;
+  const db = b.walkingDistanceMeters ?? Infinity;
+  return da - db;
+}
 
 export function ListView({
   recommendations,
   categoryStyles,
+  popularIds,
   onSelect,
 }: {
   recommendations: Recommendation[];
   categoryStyles: CategoryStyleMap;
+  popularIds?: Set<string>;
   onSelect: (recommendation: Recommendation) => void;
 }) {
-  const selects = recommendations
-    .filter((r) => r.isSelect)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
-  const standard = recommendations
-    .filter((r) => !r.isSelect)
-    .sort((a, b) => a.displayOrder - b.displayOrder);
+  const selects = recommendations.filter((r) => r.isSelect).sort(byDistance);
+  const standard = recommendations.filter((r) => !r.isSelect).sort(byDistance);
 
   return (
     <div className="w-full bg-[var(--seasonal-card)] px-4 pb-8 pt-4">
@@ -28,7 +35,13 @@ export function ListView({
           </h3>
           <div className="flex flex-col gap-2">
             {selects.map((r) => (
-              <Row key={r.id} recommendation={r} categoryStyles={categoryStyles} onSelect={onSelect} />
+              <Row
+                key={r.id}
+                recommendation={r}
+                categoryStyles={categoryStyles}
+                isPopular={popularIds?.has(r.id) ?? false}
+                onSelect={onSelect}
+              />
             ))}
           </div>
         </section>
@@ -37,7 +50,13 @@ export function ListView({
       <section>
         <div className="flex flex-col gap-2">
           {standard.map((r) => (
-            <Row key={r.id} recommendation={r} categoryStyles={categoryStyles} onSelect={onSelect} />
+            <Row
+              key={r.id}
+              recommendation={r}
+              categoryStyles={categoryStyles}
+              isPopular={popularIds?.has(r.id) ?? false}
+              onSelect={onSelect}
+            />
           ))}
         </div>
       </section>
@@ -52,10 +71,12 @@ export function ListView({
 function Row({
   recommendation,
   categoryStyles,
+  isPopular,
   onSelect,
 }: {
   recommendation: Recommendation;
   categoryStyles: CategoryStyleMap;
+  isPopular: boolean;
   onSelect: (recommendation: Recommendation) => void;
 }) {
   const style = categoryStyles[recommendation.category];
@@ -77,6 +98,14 @@ function Row({
           {recommendation.isSelect && (
             <span className="rounded-full bg-[var(--gold)] px-1.5 py-0.5 text-[10px] font-semibold text-white">
               SELECT
+            </span>
+          )}
+          {isPopular && (
+            <span
+              className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white"
+              style={{ backgroundColor: POPULAR_BADGE_COLOR }}
+            >
+              POPULAR
             </span>
           )}
         </span>

@@ -4,10 +4,11 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import MapLibreMap, { type MapEvent, type MapRef } from "react-map-gl/maplibre";
 import Supercluster, { type ClusterFeature, type PointFeature } from "supercluster";
-import type { Recommendation } from "@/lib/types";
+import { CATEGORIES, type Recommendation } from "@/lib/types";
 import { DEFAULT_MAP_STYLE_URL, TREADWELL_ORIGIN } from "@/lib/constants";
 import { getSeasonalPalette } from "@/lib/seasonalPalette";
 import { applyLamplightColors, LAMPLIGHT_PALETTE, useLamplight } from "@/lib/lamplight";
+import { isRainOrSnow } from "@/lib/weather";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useMapConfig } from "@/hooks/useMapConfig";
 import { useCategoryStyles } from "@/hooks/useCategoryStyles";
@@ -15,8 +16,11 @@ import { useFilters } from "@/hooks/useFilters";
 import { useIdleReset } from "@/hooks/useIdleReset";
 import { useScreensaver } from "@/hooks/useScreensaver";
 import { useCart } from "@/hooks/useCart";
+import { useWeather } from "@/hooks/useWeather";
+import { usePopular } from "@/hooks/usePopular";
 import { logEvent } from "@/lib/analytics";
 import { StarMarker } from "./StarMarker";
+import { WeatherBadge } from "./WeatherBadge";
 import { TreadwellMarker } from "./TreadwellMarker";
 import { ClusterMarker } from "./ClusterMarker";
 import { MapControls } from "./MapControls";
@@ -82,9 +86,31 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   const [loaderPhase, setLoaderPhase] = useState<"idle" | "settling" | "done">("idle");
   const [isCartOpen, setIsCartOpen] = useState(false);
   const cart = useCart();
+  const weather = useWeather();
+  const popularIds = usePopular();
   // Computed once per mount, not re-checked mid-session -- a guest's visit
   // won't cross a season boundary, so there's no need to watch the clock.
   const seasonal = useMemo(() => getSeasonalPalette(), []);
+
+  // On a rainy/snowy day, default the category filter to indoor picks
+  // (everything except Outdoor & Waterfront) instead of showing everything.
+  // Guarded so this only ever applies once per weather value we've seen --
+  // it should never silently overwrite a guest's own filter choice on a
+  // later hourly weather refresh, only set the *starting* state.
+  const weatherDefaultAppliedRef = useRef(false);
+  function applyWeatherAwareDefault() {
+    if (weather && isRainOrSnow(weather.condition)) {
+      filters.setSelectedCategories(new Set(CATEGORIES.filter((c) => c !== "outdoor")));
+    } else {
+      filters.setSelectedCategories(new Set());
+    }
+  }
+  useEffect(() => {
+    if (!weather || weatherDefaultAppliedRef.current) return;
+    weatherDefaultAppliedRef.current = true;
+    applyWeatherAwareDefault();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weather]);
 
   const standardFiltered = useMemo(
     () => filters.filtered.filter((r) => !r.isSelect),
@@ -152,6 +178,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     setSelectedEntity(null);
     setView("map");
     filters.showAll();
+    applyWeatherAwareDefault();
     cart.clearCart();
     setIsCartOpen(false);
     mapRef.current?.flyTo({
@@ -222,6 +249,17 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex >= 0 && currentIndex < sameCategorySorted.length - 1;
 
+  // "More like this" -- same category, closest first, current listing
+  // excluded, capped so the carousel doesn't get unwieldy on a category
+  // like Restaurants with dozens of entries.
+  const relatedRecommendations = useMemo(() => {
+    if (selectedEntity?.type !== "recommendation") return [];
+    return sameCategorySorted
+      .filter((r) => r.id !== selectedEntity.data.id)
+      .sort((a, b) => (a.walkingDistanceMeters ?? Infinity) - (b.walkingDistanceMeters ?? Infinity))
+      .slice(0, 8);
+  }, [sameCategorySorted, selectedEntity]);
+
   return (
     <div
       className="relative h-full w-full overflow-hidden bg-[#8FB0AE]"
@@ -241,8 +279,11 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
       }
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-3">
-        <div className="pointer-events-auto rounded-full bg-white/95 px-4 py-2 text-sm font-semibold tracking-wide text-[#1B1408] shadow-md">
-          The Treadwell Mansion
+        <div className="flex flex-col items-start gap-2">
+          <div className="pointer-events-auto rounded-full bg-white/95 px-4 py-2 text-sm font-semibold tracking-wide text-[#1B1408] shadow-md">
+            The Treadwell Mansion
+          </div>
+          <WeatherBadge weather={weather} />
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           <div className="flex overflow-hidden rounded-full bg-white/95 text-sm font-medium shadow-md ring-1 ring-black/10">
@@ -275,10 +316,12 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               categoryStyles={effectiveCategoryStyles}
               selectedCategories={filters.selectedCategories}
               selectsOnly={filters.selectsOnly}
+              maxWalkMinutes={filters.maxWalkMinutes}
               filteredCount={filters.filtered.length}
               totalCount={recommendations.filter((r) => r.published).length}
               onToggleCategory={filters.toggleCategory}
               onToggleSelects={filters.toggleSelectsOnly}
+              onSetMaxWalkMinutes={filters.setMaxWalkMinutes}
               onShowAll={filters.showAll}
             />
           </div>
@@ -297,14 +340,21 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               categoryStyles={effectiveCategoryStyles}
               selectedCategories={filters.selectedCategories}
               selectsOnly={filters.selectsOnly}
+              maxWalkMinutes={filters.maxWalkMinutes}
               filteredCount={filters.filtered.length}
               totalCount={recommendations.filter((r) => r.published).length}
               onToggleCategory={filters.toggleCategory}
               onToggleSelects={filters.toggleSelectsOnly}
+              onSetMaxWalkMinutes={filters.setMaxWalkMinutes}
               onShowAll={filters.showAll}
             />
           </div>
-          <ListView recommendations={filters.filtered} categoryStyles={effectiveCategoryStyles} onSelect={selectRecommendation} />
+          <ListView
+            recommendations={filters.filtered}
+            categoryStyles={effectiveCategoryStyles}
+            popularIds={popularIds}
+            onSelect={selectRecommendation}
+          />
         </div>
       ) : (
         <div key="map" className="animate-page-turn-in-map absolute inset-0">
@@ -407,6 +457,11 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
               ? () => cart.toggleCart(selectedEntity.data.id)
               : undefined
           }
+          isPopular={
+            selectedEntity.type === "recommendation" ? popularIds.has(selectedEntity.data.id) : false
+          }
+          related={relatedRecommendations}
+          onSelectRelated={selectRecommendation}
         />
       )}
 

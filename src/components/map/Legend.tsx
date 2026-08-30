@@ -1,6 +1,7 @@
 "use client";
 
 import { CATEGORIES, type Category, type CategoryStyleMap } from "@/lib/types";
+import { WALK_DISTANCE_OPTIONS } from "@/lib/constants";
 import { CategoryIcon } from "./CategoryIcon";
 
 const GOLD = "var(--gold, #A98235)";
@@ -35,22 +36,26 @@ export function Legend({
   categoryStyles,
   selectedCategories,
   selectsOnly,
+  maxWalkMinutes,
   filteredCount,
   totalCount,
   onToggleCategory,
   onToggleSelects,
+  onSetMaxWalkMinutes,
   onShowAll,
 }: {
   categoryStyles: CategoryStyleMap;
   selectedCategories: Set<Category>;
   selectsOnly: boolean;
+  maxWalkMinutes: number | null;
   filteredCount: number;
   totalCount: number;
   onToggleCategory: (category: Category) => void;
   onToggleSelects: () => void;
+  onSetMaxWalkMinutes: (minutes: number | null) => void;
   onShowAll: () => void;
 }) {
-  const hasActiveFilter = selectedCategories.size > 0 || selectsOnly;
+  const hasActiveFilter = selectedCategories.size > 0 || selectsOnly || maxWalkMinutes != null;
 
   return (
     <div className="pointer-events-auto w-full max-w-xs">
@@ -127,6 +132,41 @@ export function Legend({
                 </button>
               );
             })}
+          </div>
+
+          <div className="mt-3 border-t border-black/10 pt-2">
+            <div className="mb-1.5 text-[10px] font-semibold tracking-wide text-[var(--ink-secondary)] uppercase opacity-70">
+              Walking Distance
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => onSetMaxWalkMinutes(null)}
+                className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                style={{
+                  borderColor: GOLD,
+                  backgroundColor: maxWalkMinutes == null ? GOLD : "transparent",
+                  color: maxWalkMinutes == null ? "#fff" : "var(--ink-secondary, #4A3B2A)",
+                }}
+              >
+                Any
+              </button>
+              {WALK_DISTANCE_OPTIONS.map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  onClick={() => onSetMaxWalkMinutes(minutes)}
+                  className="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                  style={{
+                    borderColor: GOLD,
+                    backgroundColor: maxWalkMinutes === minutes ? GOLD : "transparent",
+                    color: maxWalkMinutes === minutes ? "#fff" : "var(--ink-secondary, #4A3B2A)",
+                  }}
+                >
+                  {minutes} min
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="mt-3 flex items-center justify-between border-t border-black/10 pt-2 text-xs text-[var(--ink-secondary)] opacity-80">

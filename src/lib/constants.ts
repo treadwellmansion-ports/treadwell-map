@@ -38,6 +38,15 @@ export const DEFAULT_CATEGORY_STYLES: CategoryStyleMap = {
 export const SELECT_RING_COLOR = "#A98235";
 export const STAR_OUTLINE_COLOR = "#3A2E20";
 
+// Walking-distance filter presets, in minutes -- the map now reaches spots
+// 60-150 min out (golf courses, the airport), so "everything" and "an
+// actual walk from the hotel" need to be easy to tell apart.
+export const WALK_DISTANCE_OPTIONS = [10, 20, 40] as const;
+
+// Distinct from SELECT_RING_COLOR (gold) so the two badges never read as
+// the same designation on a listing that happens to be both.
+export const POPULAR_BADGE_COLOR = "#B0522D";
+
 export const DEFAULT_MAP_CONFIG = {
   centerLat: 43.076,
   centerLng: -70.757,

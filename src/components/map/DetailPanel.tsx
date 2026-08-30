@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { CategoryStyleMap, Recommendation } from "@/lib/types";
-import { TREADWELL_ORIGIN } from "@/lib/constants";
+import { POPULAR_BADGE_COLOR, TREADWELL_ORIGIN } from "@/lib/constants";
 import { formatWalkingInfo } from "@/lib/geo/directions";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { CategoryIcon } from "./CategoryIcon";
@@ -26,6 +26,9 @@ export function DetailPanel({
   hasNext,
   isInCart,
   onToggleCart,
+  isPopular,
+  related,
+  onSelectRelated,
 }: {
   entity: SelectedEntity;
   categoryStyles: CategoryStyleMap;
@@ -36,6 +39,9 @@ export function DetailPanel({
   hasNext: boolean;
   isInCart?: boolean;
   onToggleCart?: () => void;
+  isPopular?: boolean;
+  related?: Recommendation[];
+  onSelectRelated?: (recommendation: Recommendation) => void;
 }) {
   const isLandscape = useMediaQuery("(orientation: landscape)");
   const [largeText, setLargeText] = useState(false);
@@ -90,6 +96,9 @@ export function DetailPanel({
             largeText={largeText}
             isInCart={isInCart ?? false}
             onToggleCart={onToggleCart}
+            isPopular={isPopular ?? false}
+            related={related ?? []}
+            onSelectRelated={onSelectRelated}
           />
         )}
       </div>
@@ -117,6 +126,9 @@ function RecommendationContent({
   largeText,
   isInCart,
   onToggleCart,
+  isPopular,
+  related,
+  onSelectRelated,
 }: {
   recommendation: Recommendation;
   categoryStyles: CategoryStyleMap;
@@ -127,6 +139,9 @@ function RecommendationContent({
   largeText: boolean;
   isInCart: boolean;
   onToggleCart?: () => void;
+  isPopular: boolean;
+  related: Recommendation[];
+  onSelectRelated?: (recommendation: Recommendation) => void;
 }) {
   const style = categoryStyles[recommendation.category];
   const walking = formatWalkingInfo(
@@ -134,29 +149,95 @@ function RecommendationContent({
     recommendation.walkingTimeMinutes
   );
 
+  // Pointer capture is only engaged once real drag movement is detected
+  // (past DRAG_THRESHOLD_PX), not on every pointerdown -- capturing
+  // immediately would redirect the click event that normally follows a
+  // plain tap/click to this container, silently swallowing clicks on any
+  // interactive child (the "More like this" carousel below has buttons;
+  // the photo strip doesn't, but shares this pattern for consistency).
+  const DRAG_THRESHOLD_PX = 4;
+
   const photoStripRef = useRef<HTMLDivElement>(null);
-  const photoDrag = useRef<{ startX: number; startScrollLeft: number } | null>(null);
+  const photoDrag = useRef<{
+    pointerId: number;
+    startX: number;
+    startScrollLeft: number;
+    dragging: boolean;
+  } | null>(null);
   const [isDraggingPhotos, setIsDraggingPhotos] = useState(false);
 
   function handlePhotoPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.pointerType !== "mouse") return; // touch already scrolls natively
     const el = photoStripRef.current;
     if (!el) return;
-    photoDrag.current = { startX: e.clientX, startScrollLeft: el.scrollLeft };
-    setIsDraggingPhotos(true);
-    el.setPointerCapture(e.pointerId);
+    photoDrag.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startScrollLeft: el.scrollLeft,
+      dragging: false,
+    };
   }
 
   function handlePhotoPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!photoDrag.current) return;
+    const drag = photoDrag.current;
     const el = photoStripRef.current;
-    if (!el) return;
-    el.scrollLeft = photoDrag.current.startScrollLeft - (e.clientX - photoDrag.current.startX);
+    if (!drag || !el) return;
+    const delta = e.clientX - drag.startX;
+    if (!drag.dragging) {
+      if (Math.abs(delta) < DRAG_THRESHOLD_PX) return;
+      drag.dragging = true;
+      setIsDraggingPhotos(true);
+      el.setPointerCapture(drag.pointerId);
+    }
+    el.scrollLeft = drag.startScrollLeft - delta;
   }
 
   function endPhotoDrag() {
     photoDrag.current = null;
     setIsDraggingPhotos(false);
+  }
+
+  // Same click-and-drag pattern as the photo strip above, applied to the
+  // "More like this" carousel further down -- see that strip's comment for
+  // why this is needed at all (mouse drag doesn't auto-scroll like touch does).
+  const relatedStripRef = useRef<HTMLDivElement>(null);
+  const relatedDrag = useRef<{
+    pointerId: number;
+    startX: number;
+    startScrollLeft: number;
+    dragging: boolean;
+  } | null>(null);
+  const [isDraggingRelated, setIsDraggingRelated] = useState(false);
+
+  function handleRelatedPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") return;
+    const el = relatedStripRef.current;
+    if (!el) return;
+    relatedDrag.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startScrollLeft: el.scrollLeft,
+      dragging: false,
+    };
+  }
+
+  function handleRelatedPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const drag = relatedDrag.current;
+    const el = relatedStripRef.current;
+    if (!drag || !el) return;
+    const delta = e.clientX - drag.startX;
+    if (!drag.dragging) {
+      if (Math.abs(delta) < DRAG_THRESHOLD_PX) return;
+      drag.dragging = true;
+      setIsDraggingRelated(true);
+      el.setPointerCapture(drag.pointerId);
+    }
+    el.scrollLeft = drag.startScrollLeft - delta;
+  }
+
+  function endRelatedDrag() {
+    relatedDrag.current = null;
+    setIsDraggingRelated(false);
   }
 
   return (
@@ -172,11 +253,21 @@ function RecommendationContent({
         >
           {recommendation.name}
         </h2>
-        {recommendation.isSelect && (
-          <span className="mt-1 shrink-0 rounded-full bg-[var(--gold)] px-2.5 py-1 text-xs font-semibold text-white">
-            Treadwell Selects
-          </span>
-        )}
+        <span className="mt-1 flex shrink-0 flex-col items-end gap-1">
+          {recommendation.isSelect && (
+            <span className="rounded-full bg-[var(--gold)] px-2.5 py-1 text-xs font-semibold text-white">
+              Treadwell Selects
+            </span>
+          )}
+          {isPopular && (
+            <span
+              className="rounded-full px-2.5 py-1 text-xs font-semibold text-white"
+              style={{ backgroundColor: POPULAR_BADGE_COLOR }}
+            >
+              Popular with Guests
+            </span>
+          )}
+        </span>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -332,6 +423,55 @@ function RecommendationContent({
           Next →
         </button>
       </div>
+
+      {related.length > 0 && (
+        <div className="mt-6">
+          <h3 className="mb-2 text-xs font-semibold tracking-wide text-[var(--gold)] uppercase">
+            More {categoryStyles[recommendation.category].label}
+          </h3>
+          <div
+            ref={relatedStripRef}
+            className={`flex gap-2 overflow-x-auto pb-2 photo-strip-scroll ${
+              isDraggingRelated ? "cursor-grabbing" : "cursor-grab"
+            }`}
+            onPointerDown={handleRelatedPointerDown}
+            onPointerMove={handleRelatedPointerMove}
+            onPointerUp={endRelatedDrag}
+            onPointerLeave={endRelatedDrag}
+            onPointerCancel={endRelatedDrag}
+          >
+            {related.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => onSelectRelated?.(r)}
+                draggable={false}
+                className="flex w-28 shrink-0 select-none flex-col items-start gap-1.5 rounded-lg bg-[var(--row-bg)] p-2 text-left"
+              >
+                {r.photos[0] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={r.photos[0]}
+                    alt=""
+                    draggable={false}
+                    className="h-16 w-full rounded object-cover"
+                  />
+                ) : (
+                  <span
+                    className="flex h-16 w-full items-center justify-center rounded"
+                    style={{ backgroundColor: categoryStyles[r.category].color }}
+                  >
+                    <CategoryIcon category={r.category} size={22} />
+                  </span>
+                )}
+                <span className="line-clamp-2 text-xs font-medium leading-tight text-[var(--ink)]">
+                  {r.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <ReportIssueButton recommendationId={recommendation.id} recommendationName={recommendation.name} />
     </div>

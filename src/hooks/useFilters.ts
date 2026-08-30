@@ -7,6 +7,7 @@ export function useFilters(recommendations: Recommendation[]) {
   const [selectedCategories, setSelectedCategories] = useState<Set<Category>>(new Set());
   const [selectsOnly, setSelectsOnly] = useState(false);
   const [query, setQuery] = useState("");
+  const [maxWalkMinutes, setMaxWalkMinutes] = useState<number | null>(null);
 
   const toggleCategory = (category: Category) => {
     setSelectedCategories((prev) => {
@@ -23,6 +24,7 @@ export function useFilters(recommendations: Recommendation[]) {
     setSelectedCategories(new Set());
     setSelectsOnly(false);
     setQuery("");
+    setMaxWalkMinutes(null);
   };
 
   const filtered = useMemo(() => {
@@ -34,18 +36,24 @@ export function useFilters(recommendations: Recommendation[]) {
         if (!matchesAny) return false;
       }
       if (selectsOnly && !r.isSelect) return false;
+      if (maxWalkMinutes != null) {
+        if (r.walkingTimeMinutes == null || r.walkingTimeMinutes > maxWalkMinutes) return false;
+      }
       if (q) {
         const haystack = `${r.name} ${r.description} ${allCategories(r).join(" ")}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
-  }, [recommendations, selectedCategories, selectsOnly, query]);
+  }, [recommendations, selectedCategories, selectsOnly, maxWalkMinutes, query]);
 
   return {
     selectedCategories,
+    setSelectedCategories,
     selectsOnly,
     query,
+    maxWalkMinutes,
+    setMaxWalkMinutes,
     setQuery,
     toggleCategory,
     toggleSelectsOnly,
