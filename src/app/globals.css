@@ -138,3 +138,13 @@ body {
   background-color: var(--gold, #a98235);
   border-radius: 999px;
 }
+
+/* Map Key slide in/out along the left edge (guest map overlay). */
+@keyframes key-slide-in {
+  from { transform: translateX(-115%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes key-slide-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-115%); opacity: 0; }
+}

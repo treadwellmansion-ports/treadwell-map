@@ -69,7 +69,12 @@ type ClusterProps = { recommendationId: string };
 type ClusterPoint = PointFeature<ClusterProps> | ClusterFeature<ClusterProps>;
 
 export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" | "embed" }) {
-  const { recommendations, loading: recsLoading } = useRecommendations();
+  const {
+    recommendations,
+    loading: recsLoading,
+    error: recsError,
+    reload: reloadRecommendations,
+  } = useRecommendations();
   const { mapConfig } = useMapConfig();
   const { categoryStyles } = useCategoryStyles();
   const filters = useFilters(recommendations);
@@ -85,6 +90,11 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   const [view, setView] = useState<"map" | "list">("map");
   const [loaderPhase, setLoaderPhase] = useState<"idle" | "settling" | "done">("idle");
   const [isCartOpen, setIsCartOpen] = useState(false);
+  // Map Key can be folded away to the left edge (map view only). "closing"
+  // plays the slide-out before the key is actually removed.
+  const [keyOpen, setKeyOpen] = useState(true);
+  const [keyClosing, setKeyClosing] = useState(false);
+  const keyCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cart = useCart();
   const weather = useWeather();
   const popularIds = usePopular();
@@ -157,6 +167,27 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     logEvent({ type: "view_recommendation", recommendationId: recommendation.id });
   }
 
+  function hideKey() {
+    if (keyCloseTimer.current) clearTimeout(keyCloseTimer.current);
+    setKeyClosing(true);
+    keyCloseTimer.current = setTimeout(() => {
+      setKeyOpen(false);
+      setKeyClosing(false);
+    }, 240);
+  }
+
+  function showKey() {
+    if (keyCloseTimer.current) clearTimeout(keyCloseTimer.current);
+    setKeyClosing(false);
+    setKeyOpen(true);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (keyCloseTimer.current) clearTimeout(keyCloseTimer.current);
+    };
+  }, []);
+
   function changeView(nextView: "map" | "list") {
     setView(nextView);
     logEvent({ type: "view_toggle", viewMode: nextView });
@@ -181,6 +212,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     applyWeatherAwareDefault();
     cart.clearCart();
     setIsCartOpen(false);
+    showKey();
     mapRef.current?.flyTo({
       center: [TREADWELL_ORIGIN.lng, TREADWELL_ORIGIN.lat],
       zoom: Math.max(mapConfig.zoom, 17),
@@ -190,6 +222,111 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
 
   useIdleReset(resetToDefault, variant === "kiosk");
   const screensaver = useScreensaver(variant === "kiosk", SCREENSAVER_TIMEOUT_MS);
+
+  // Kiosk-only navigation lockdown (Section A) and defensive Chromium-gesture
+  // interception (Section B). Attached once for the life of the session
+  // (deps=[variant], which never changes at runtime) rather than re-armed on
+  // every idle-reset, so nothing here can accumulate over days of uptime
+  // (Section G). Everything is a no-op on /map and /embed.
+  //
+  // Deliberately NOT intercepted here: pinch-zoom and double-tap-zoom of the
+  // MAP itself. Those are MapLibre's own wanted, intentional gestures,
+  // handled entirely by the map canvas's own touch listeners. The *browser
+  // page's* pinch/double-tap zoom -- the actual escape concern -- is locked
+  // out at the engine level by the viewport meta in kiosk/page.tsx
+  // (maximumScale: 1, userScalable: false), which doesn't touch element-
+  // level gesture handling at all. A manual touchmove/touchend blocker here
+  // would land on the same events MapLibre needs and break normal map use.
+  useEffect(() => {
+    if (variant !== "kiosk") return;
+
+    const KIOSK_ALLOWED_ORIGIN = window.location.origin;
+
+    function guardClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      let url: URL;
+      try {
+        url = new URL(anchor.href, window.location.href);
+      } catch {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (url.origin !== KIOSK_ALLOWED_ORIGIN) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+
+    function blockContextMenu(e: Event) {
+      e.preventDefault();
+    }
+
+    function blockSelectStart(e: Event) {
+      e.preventDefault();
+    }
+
+    // Capture phase so this runs before any other click handler, matching
+    // "intercept ... at the application level" rather than relying on a
+    // child component to cooperate.
+    document.addEventListener("click", guardClick, true);
+    document.addEventListener("contextmenu", blockContextMenu);
+    document.addEventListener("selectstart", blockSelectStart);
+
+    const originalOpen = window.open;
+    // No code in this app calls window.open today (verified against the
+    // whole src tree), but this closes the gap against anything dynamic --
+    // admin-entered data, a future dependency -- rather than assuming it
+    // will stay that way.
+    window.open = () => null;
+
+    return () => {
+      document.removeEventListener("click", guardClick, true);
+      document.removeEventListener("contextmenu", blockContextMenu);
+      document.removeEventListener("selectstart", blockSelectStart);
+      window.open = originalOpen;
+    };
+  }, [variant]);
+
+  // Kiosk-only offline/outage recovery (Section D). Split into two effects:
+  // the online/offline listener attaches once (stable deps) and a separate
+  // retry-interval effect only churns when recsError's truthiness actually
+  // flips -- avoids re-attaching listeners on every render over a multi-day
+  // session (Section G). Mirrors the ref-forwarding pattern already used by
+  // useIdleReset/useScreensaver so the interval always calls the latest
+  // reload without needing reload itself in the dependency array.
+  const [isOffline, setIsOffline] = useState(false);
+  const reloadRef = useRef(reloadRecommendations);
+  useEffect(() => {
+    reloadRef.current = reloadRecommendations;
+  });
+
+  useEffect(() => {
+    if (variant !== "kiosk") return;
+    // No initial navigator.onLine read here: a page that loads while offline
+    // fails its data fetch, which already raises the same overlay via recsError.
+    function goOffline() {
+      setIsOffline(true);
+    }
+    function goOnline() {
+      setIsOffline(false);
+      reloadRef.current();
+    }
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    return () => {
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
+    };
+  }, [variant]);
+
+  useEffect(() => {
+    if (variant !== "kiosk" || !recsError) return;
+    const interval = setInterval(() => reloadRef.current(), 15000);
+    return () => clearInterval(interval);
+  }, [variant, recsError]);
 
   // Debounced so we log intent-to-search, not every keystroke.
   useEffect(() => {
@@ -265,6 +402,14 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
       className="relative h-full w-full overflow-hidden bg-[#8FB0AE]"
       style={
         {
+          // Functional edge-swipe lockout (Chromium's own history-navigation
+          // gesture recognizer honors this), not a cosmetic style -- paired
+          // with the text-selection preventDefault above for the same
+          // "no visible-only fixes" reason. Kiosk-only; /map and /embed keep
+          // the browser's normal overscroll/selection behavior.
+          ...(variant === "kiosk"
+            ? { overscrollBehavior: "none", WebkitUserSelect: "none", userSelect: "none" }
+            : null),
           "--seasonal-card": isLamplight ? LAMPLIGHT_PALETTE.card : (seasonal?.card ?? "#FBF6EA"),
           "--seasonal-deep-tan": isLamplight ? LAMPLIGHT_PALETTE.border : (seasonal?.deepTan ?? "#B9A47B"),
           "--ink": isLamplight ? LAMPLIGHT_PALETTE.ink : "#1B1408",
@@ -307,20 +452,48 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
 
       {view === "map" && (
         <div className="pointer-events-none absolute inset-x-0 top-16 z-20 flex items-start justify-between gap-3 p-3">
-          <div className="flex flex-col gap-3">
+          <div className="flex w-full max-w-xs flex-col gap-3">
             <SearchBar value={filters.query} onChange={filters.setQuery} />
-            <Legend
-              categoryStyles={effectiveCategoryStyles}
-              selectedCategories={filters.selectedCategories}
-              selectsOnly={filters.selectsOnly}
-              maxWalkMinutes={filters.maxWalkMinutes}
-              filteredCount={filters.filtered.length}
-              totalCount={recommendations.filter((r) => r.published).length}
-              onToggleCategory={filters.toggleCategory}
-              onToggleSelects={filters.toggleSelectsOnly}
-              onSetMaxWalkMinutes={filters.setMaxWalkMinutes}
-              onShowAll={filters.showAll}
-            />
+            {keyOpen ? (
+              <div
+                style={{
+                  animation: keyClosing
+                    ? "key-slide-out 240ms ease-in forwards"
+                    : "key-slide-in 260ms ease-out",
+                }}
+              >
+                <Legend
+                  categoryStyles={effectiveCategoryStyles}
+                  selectedCategories={filters.selectedCategories}
+                  selectsOnly={filters.selectsOnly}
+                  maxWalkMinutes={filters.maxWalkMinutes}
+                  filteredCount={filters.filtered.length}
+                  totalCount={recommendations.filter((r) => r.published).length}
+                  onToggleCategory={filters.toggleCategory}
+                  onToggleSelects={filters.toggleSelectsOnly}
+                  onSetMaxWalkMinutes={filters.setMaxWalkMinutes}
+                  onShowAll={filters.showAll}
+                  onHide={hideKey}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={showKey}
+                aria-label="Show map key"
+                className="pointer-events-auto -ml-3 flex w-fit items-center gap-2 rounded-r-full py-2.5 pr-4 pl-5 text-xs font-semibold tracking-[0.15em] shadow-md"
+                style={{
+                  backgroundColor: "var(--cta-bg, #1B1408)",
+                  color: "var(--cta-text, #E9D8B5)",
+                  animation: "key-slide-in 260ms ease-out",
+                }}
+              >
+                MAP KEY
+                <span aria-hidden="true" className="text-base leading-none">
+                  ›
+                </span>
+              </button>
+            )}
             <WeatherBadge weather={weather} />
           </div>
           <MapControls onReturnDowntown={returnToDowntown} onReturnTreadwell={returnToTreadwell} />
@@ -461,6 +634,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           }
           related={relatedRecommendations}
           onSelectRelated={selectRecommendation}
+          isKiosk={variant === "kiosk"}
         />
       )}
 
@@ -484,6 +658,23 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
       )}
 
       {screensaver.active && <Screensaver onDismiss={screensaver.dismiss} />}
+
+      {/* Kiosk-only outage recovery (Section D). Above the screensaver
+          (z-[100]) since accurate status matters more than the attract loop
+          when something's actually wrong. Disappears on its own the next
+          time `reload` succeeds or the browser reports back online --
+          no manual reload, no guest interaction required. */}
+      {variant === "kiosk" && (isOffline || recsError) && (
+        <div
+          className="pointer-events-auto absolute inset-0 z-[110] flex items-center justify-center bg-[#1B1408]/95 p-6 text-center"
+          role="status"
+        >
+          <div>
+            <p className="text-lg font-semibold text-[#F4E9D6]">Connection temporarily unavailable</p>
+            <p className="mt-2 text-sm text-[#C9B893]">Please try again in a moment.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -29,6 +29,7 @@ export function DetailPanel({
   isPopular,
   related,
   onSelectRelated,
+  isKiosk,
 }: {
   entity: SelectedEntity;
   categoryStyles: CategoryStyleMap;
@@ -42,6 +43,11 @@ export function DetailPanel({
   isPopular?: boolean;
   related?: Recommendation[];
   onSelectRelated?: (recommendation: Recommendation) => void;
+  // Kiosk hardware has no way to "leave" the fullscreen app -- phone/website/
+  // directions must never render as tappable navigation there (Section A of
+  // the kiosk security pass). Defaults to false so /map and /embed, which
+  // don't pass this prop at all, are completely unaffected.
+  isKiosk?: boolean;
 }) {
   const isLandscape = useMediaQuery("(orientation: landscape)");
   const [largeText, setLargeText] = useState(false);
@@ -99,6 +105,7 @@ export function DetailPanel({
             isPopular={isPopular ?? false}
             related={related ?? []}
             onSelectRelated={onSelectRelated}
+            isKiosk={isKiosk ?? false}
           />
         )}
       </div>
@@ -129,6 +136,7 @@ function RecommendationContent({
   isPopular,
   related,
   onSelectRelated,
+  isKiosk,
 }: {
   recommendation: Recommendation;
   categoryStyles: CategoryStyleMap;
@@ -142,6 +150,7 @@ function RecommendationContent({
   isPopular: boolean;
   related: Recommendation[];
   onSelectRelated?: (recommendation: Recommendation) => void;
+  isKiosk: boolean;
 }) {
   const style = categoryStyles[recommendation.category];
   const walking = formatWalkingInfo(
@@ -344,21 +353,35 @@ function RecommendationContent({
         {recommendation.phone && (
           <div>
             <dt className="inline opacity-70">Phone: </dt>
-            <dd className="inline">
-              <a href={`tel:${recommendation.phone}`} className="underline">
-                {recommendation.phone}
-              </a>
-            </dd>
+            {isKiosk ? (
+              // Static text only on kiosk -- no tel: link, nothing tappable.
+              // A guest on shared lobby hardware has no phone app to hand
+              // off to anyway; this is informational only.
+              <dd className="inline">{recommendation.phone}</dd>
+            ) : (
+              <dd className="inline">
+                <a href={`tel:${recommendation.phone}`} className="underline">
+                  {recommendation.phone}
+                </a>
+              </dd>
+            )}
           </div>
         )}
         {recommendation.website && (
           <div>
             <dt className="inline opacity-70">Website: </dt>
-            <dd className="inline">
-              <a href={recommendation.website} target="_blank" rel="noreferrer" className="underline">
-                {recommendation.website.replace(/^https?:\/\//, "")}
-              </a>
-            </dd>
+            {isKiosk ? (
+              // Static domain text only -- no href, no target, no tap
+              // action. Kiosk navigation lockdown (Section A) forbids any
+              // top-level navigation off the app's own origin.
+              <dd className="inline">{recommendation.website.replace(/^https?:\/\//, "")}</dd>
+            ) : (
+              <dd className="inline">
+                <a href={recommendation.website} target="_blank" rel="noreferrer" className="underline">
+                  {recommendation.website.replace(/^https?:\/\//, "")}
+                </a>
+              </dd>
+            )}
           </div>
         )}
         {recommendation.hours && (
@@ -376,15 +399,21 @@ function RecommendationContent({
       </dl>
 
       <div className="mt-5 flex gap-2">
-        <a
-          href={directionsUrl(recommendation.lat, recommendation.lng)}
-          target="_blank"
-          rel="noreferrer"
-          className="flex flex-1 items-center justify-center rounded-full bg-[var(--cta-bg)] px-4 text-sm font-semibold text-[var(--cta-text)] transition-colors duration-[600ms] hover:opacity-90"
-          style={{ minHeight: largeText ? 48 : 44 }}
-        >
-          Get Directions
-        </a>
+        {!isKiosk && (
+          <a
+            href={directionsUrl(recommendation.lat, recommendation.lng)}
+            target="_blank"
+            rel="noreferrer"
+            className="flex flex-1 items-center justify-center rounded-full bg-[var(--cta-bg)] px-4 text-sm font-semibold text-[var(--cta-text)] transition-colors duration-[600ms] hover:opacity-90"
+            style={{ minHeight: largeText ? 48 : 44 }}
+          >
+            Get Directions
+          </a>
+        )}
+        {/* No kiosk equivalent rendered here -- the address this would point
+            to is already shown as static text above (the Address: field),
+            so there's no informational value being dropped, only the
+            off-app navigation action itself. */}
         {onToggleCart && (
           <button
             type="button"

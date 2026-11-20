@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { recommendationFromRow, type RecommendationRow } from "@/lib/types";
-import { badRequest, isCategory, parseAdditionalCategories, unauthorized } from "@/lib/api-helpers";
+import { badRequest, parseAdditionalCategories, unauthorized } from "@/lib/api-helpers";
+import { readJsonBody, validateRecommendationInput } from "@/lib/validate";
 import { SELECTS_CAP, TREADWELL_ORIGIN } from "@/lib/constants";
 import { getWalkingInfo } from "@/lib/geo/directions";
 
@@ -28,14 +29,10 @@ export async function POST(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return unauthorized();
 
-  const body = await request.json();
-
-  if (typeof body.name !== "string" || !body.name.trim()) return badRequest("name is required");
-  if (!isCategory(body.category)) return badRequest("category is invalid");
-  if (typeof body.address !== "string" || !body.address.trim())
-    return badRequest("address is required");
-  if (typeof body.lat !== "number" || typeof body.lng !== "number")
-    return badRequest("lat/lng are required numbers");
+  const body = await readJsonBody(request);
+  if (!body) return badRequest("Request body must be valid JSON");
+  const invalid = validateRecommendationInput(body, false);
+  if (invalid) return badRequest(invalid);
 
   const additional = parseAdditionalCategories(body.additionalCategories, body.category);
   if ("error" in additional) return badRequest(additional.error);

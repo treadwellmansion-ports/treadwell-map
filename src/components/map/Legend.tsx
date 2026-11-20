@@ -43,6 +43,7 @@ export function Legend({
   onToggleSelects,
   onSetMaxWalkMinutes,
   onShowAll,
+  onHide,
 }: {
   categoryStyles: CategoryStyleMap;
   selectedCategories: Set<Category>;
@@ -54,6 +55,9 @@ export function Legend({
   onToggleSelects: () => void;
   onSetMaxWalkMinutes: (minutes: number | null) => void;
   onShowAll: () => void;
+  // When provided (map view only), shows a handle on the card's right edge
+  // that folds the whole key away to the left so more of the map is visible.
+  onHide?: () => void;
 }) {
   const hasActiveFilter = selectedCategories.size > 0 || selectsOnly || maxWalkMinutes != null;
 
@@ -80,7 +84,18 @@ export function Legend({
       </div>
 
       {/* Double-rule frame with corner brackets. */}
-      <div className="-mt-2.5 rounded-lg p-[3px]" style={{ border: `1px solid ${GOLD}88` }}>
+      <div className="relative -mt-2.5 rounded-lg p-[3px]" style={{ border: `1px solid ${GOLD}88` }}>
+        {onHide && (
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label="Hide map key"
+            className="absolute top-1/2 -right-8 z-10 flex h-20 w-8 -translate-y-1/2 items-center justify-center rounded-r-xl text-lg font-bold shadow-md transition-opacity hover:opacity-90"
+            style={{ backgroundColor: PLAQUE_BG, color: PLAQUE_TEXT }}
+          >
+            ‹
+          </button>
+        )}
         <div
           className="relative rounded-md p-3 pt-4 transition-colors duration-[600ms]"
           style={{ border: `1px solid ${GOLD}`, backgroundColor: "var(--seasonal-card, #FBF6EA)" }}

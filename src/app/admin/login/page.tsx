@@ -23,7 +23,14 @@ function LoginForm() {
       setError(error.message);
       return;
     }
-    router.push(searchParams.get("next") ?? "/admin");
+    // ?next= is attacker-controllable via a crafted link; only follow
+    // same-site paths so a login can never bounce an admin to another site.
+    const requested = searchParams.get("next");
+    const safeNext =
+      requested && requested.startsWith("/") && !requested.startsWith("//") && !requested.includes("\\")
+        ? requested
+        : "/admin";
+    router.push(safeNext);
     router.refresh();
   }
 

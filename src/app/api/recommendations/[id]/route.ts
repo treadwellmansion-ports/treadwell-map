@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { recommendationFromRow, type RecommendationRow } from "@/lib/types";
 import { badRequest, isCategory, notFound, parseAdditionalCategories, unauthorized } from "@/lib/api-helpers";
+import { readJsonBody, validateRecommendationInput } from "@/lib/validate";
 import { SELECTS_CAP, TREADWELL_ORIGIN } from "@/lib/constants";
 import { getWalkingInfo } from "@/lib/geo/directions";
 
@@ -36,7 +37,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (existingError || !existingRow) return notFound();
   const existing = existingRow as RecommendationRow;
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
+  if (!body) return badRequest("Request body must be valid JSON");
+  const invalid = validateRecommendationInput(body, true);
+  if (invalid) return badRequest(invalid);
   if (body.category !== undefined && !isCategory(body.category))
     return badRequest("category is invalid");
 

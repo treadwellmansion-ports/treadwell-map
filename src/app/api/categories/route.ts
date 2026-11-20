@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { CategoryStyleRow } from "@/lib/types";
 import { badRequest, isCategory, unauthorized } from "@/lib/api-helpers";
+import { readJsonBody } from "@/lib/validate";
 
 export async function GET() {
   const supabase = await createClient();
@@ -19,11 +20,13 @@ export async function PATCH(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return unauthorized();
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
+  if (!body) return badRequest("Request body must be valid JSON");
   if (!isCategory(body.category)) return badRequest("category is invalid");
   if (typeof body.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(body.color))
     return badRequest("color must be a hex string like #8C2F39");
-  if (typeof body.label !== "string" || !body.label.trim()) return badRequest("label is required");
+  if (typeof body.label !== "string" || !body.label.trim() || body.label.length > 60)
+    return badRequest("label is required (max 60 characters)");
 
   const { data, error } = await supabase
     .from("category_styles")

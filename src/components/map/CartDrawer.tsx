@@ -1,11 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { CategoryStyleMap, Recommendation } from "@/lib/types";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { CategoryIcon } from "./CategoryIcon";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// The list/send popup always uses the light parchment palette, even when the
+// map itself has switched to its dark evening "lamplight" look -- it's a form
+// guests type into, and it should stay bright and easy to read at any hour.
+// These override the theme variables the GuestMap root sets, for this subtree only.
+const LIGHT_PALETTE = {
+  "--seasonal-card": "#FBF6EA",
+  "--ink": "#1B1408",
+  "--ink-secondary": "#4A3B2A",
+  "--border": "rgba(0,0,0,0.1)",
+  "--gold": "#A98235",
+  "--cta-bg": "#1B1408",
+  "--cta-text": "#F4E9D6",
+  "--row-bg": "rgba(255,255,255,0.85)",
+  "--row-bg-hover": "rgba(255,255,255,1)",
+} as CSSProperties;
 
 export function CartDrawer({
   recommendations,
@@ -66,7 +82,7 @@ export function CartDrawer({
   }
 
   return (
-    <div className={`${containerClass} pointer-events-auto z-40`}>
+    <div className={`${containerClass} pointer-events-auto z-40`} style={LIGHT_PALETTE}>
       <div className="sticky top-0 flex items-center justify-between bg-[var(--seasonal-card)] p-4 transition-colors duration-[600ms]">
         <h2 className="text-lg font-semibold text-[var(--ink)]">Your List</h2>
         <button
@@ -132,7 +148,7 @@ export function CartDrawer({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Jane Smith"
-                  className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 text-sm text-black outline-none focus:ring-2 focus:ring-[var(--gold)]"
+                  className="mt-1 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black outline-none focus:ring-2 focus:ring-[var(--gold)]"
                 />
               </label>
               <label className="block text-sm font-medium text-[var(--ink)]">
@@ -143,7 +159,7 @@ export function CartDrawer({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 text-sm text-black outline-none focus:ring-2 focus:ring-[var(--gold)]"
+                  className="mt-1 w-full rounded-lg border border-black/15 bg-white px-3 py-2 text-sm text-black outline-none focus:ring-2 focus:ring-[var(--gold)]"
                 />
               </label>
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { mapConfigFromRow, type MapConfigRow } from "@/lib/types";
-import { unauthorized } from "@/lib/api-helpers";
+import { badRequest, unauthorized } from "@/lib/api-helpers";
+import { readJsonBody, validateMapConfigInput } from "@/lib/validate";
 
 export async function GET() {
   const supabase = await createClient();
@@ -17,7 +18,10 @@ export async function PATCH(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return unauthorized();
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
+  if (!body) return badRequest("Request body must be valid JSON");
+  const invalid = validateMapConfigInput(body);
+  if (invalid) return badRequest(invalid);
   const update: Record<string, unknown> = {};
   if (body.centerLat !== undefined) update.center_lat = body.centerLat;
   if (body.centerLng !== undefined) update.center_lng = body.centerLng;

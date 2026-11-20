@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 const ACTIVITY_EVENTS = ["pointerdown", "touchstart", "keydown", "wheel"] as const;
 
 // Resets the kiosk to its default state after a period of no guest
