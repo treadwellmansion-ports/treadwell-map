@@ -82,6 +82,10 @@ export async function sendCartEmails({
       <p style="font-size:13px;color:#6b5636;margin-top:20px;">
         Enjoy Portsmouth! -- ${escapeHtml(TREADWELL_ORIGIN.name)}
       </p>
+      <p style="font-size:12px;color:#8a7650;margin-top:16px;line-height:1.5;">
+        You're receiving this because this address was entered on the guest map at ${escapeHtml(TREADWELL_ORIGIN.name)}.
+        If that wasn't you, please ignore this message &mdash; nothing more will be sent.
+      </p>
     `
   );
 

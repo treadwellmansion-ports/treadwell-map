@@ -1,31 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 export function ReportIssueButton({
   recommendationId,
-  recommendationName,
 }: {
   recommendationId: string;
-  recommendationName: string;
+  // Still accepted so existing callers keep compiling; the server looks the
+  // listing's name up itself rather than trusting one sent from the browser.
+  recommendationName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    const supabase = createClient();
-    const { error } = await supabase.from("issue_reports").insert({
-      recommendation_id: recommendationId,
-      recommendation_name: recommendationName,
-      message: message.trim() || null,
-    });
-    setSubmitting(false);
-    if (!error) setSubmitted(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/issue-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recommendationId, message }),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        const data = await res.json().catch(() => null);
+        setError(data?.error ?? "Couldn't send that just now. Please try again.");
+      }
+    } catch {
+      setError("Couldn't send that just now. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -52,10 +63,12 @@ export function ReportIssueButton({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={2}
+          maxLength={500}
           placeholder="e.g. Closed, moved, wrong phone number..."
           className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-black outline-none focus:ring-2 focus:ring-[#A98235]"
         />
       </label>
+      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
       <div className="mt-2 flex justify-end gap-2">
         <button
           type="button"

@@ -19,6 +19,7 @@ import { useCart } from "@/hooks/useCart";
 import { useWeather } from "@/hooks/useWeather";
 import { usePopular } from "@/hooks/usePopular";
 import { logEvent } from "@/lib/analytics";
+import { CHECK_EVERY_MS, RELOAD_STAMP_KEY, decideReload } from "@/lib/kioskRefresh";
 import { StarMarker } from "./StarMarker";
 import { WeatherBadge } from "./WeatherBadge";
 import { TreadwellMarker } from "./TreadwellMarker";
@@ -75,6 +76,12 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     error: recsError,
     reload: reloadRecommendations,
   } = useRecommendations();
+  // Always points at the latest reload function, so timers and event handlers
+  // can call it without it being a dependency of their effects.
+  const reloadRef = useRef(reloadRecommendations);
+  useEffect(() => {
+    reloadRef.current = reloadRecommendations;
+  });
   const { mapConfig } = useMapConfig();
   const { categoryStyles } = useCategoryStyles();
   const filters = useFilters(recommendations);
@@ -213,6 +220,8 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     cart.clearCart();
     setIsCartOpen(false);
     showKey();
+    // Pick up any listing edits made in the admin since the page loaded.
+    reloadRef.current();
     mapRef.current?.flyTo({
       center: [TREADWELL_ORIGIN.lng, TREADWELL_ORIGIN.lat],
       zoom: Math.max(mapConfig.zoom, 17),
@@ -298,10 +307,6 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
   // useIdleReset/useScreensaver so the interval always calls the latest
   // reload without needing reload itself in the dependency array.
   const [isOffline, setIsOffline] = useState(false);
-  const reloadRef = useRef(reloadRecommendations);
-  useEffect(() => {
-    reloadRef.current = reloadRecommendations;
-  });
 
   useEffect(() => {
     if (variant !== "kiosk") return;
@@ -322,11 +327,66 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
     };
   }, [variant]);
 
+  // While the listings can't be loaded, keep retrying quietly (all variants).
   useEffect(() => {
-    if (variant !== "kiosk" || !recsError) return;
+    if (!recsError) return;
     const interval = setInterval(() => reloadRef.current(), 15000);
     return () => clearInterval(interval);
-  }, [variant, recsError]);
+  }, [recsError]);
+
+  // Kiosk self-refresh: reload the page on its own when a newer version of the
+  // site has been published, and once a night, so the monitor never needs a
+  // manual refresh. Only ever while nobody has touched the screen (see
+  // lib/kioskRefresh.ts). Attached once for the whole session, like the guards above.
+  useEffect(() => {
+    if (variant !== "kiosk") return;
+    const loadedAt = Date.now();
+    let lastActivity = Date.now();
+    const markActive = () => {
+      lastActivity = Date.now();
+    };
+    const activityEvents = ["pointerdown", "touchstart", "keydown", "wheel"] as const;
+    activityEvents.forEach((evt) => window.addEventListener(evt, markActive, { passive: true }));
+
+    async function check() {
+      let remoteBuild: string | null = null;
+      try {
+        const res = await fetch("/api/version", { cache: "no-store" });
+        if (res.ok) remoteBuild = ((await res.json()) as { buildId?: string | null }).buildId ?? null;
+      } catch {
+        return; // offline or the server is down: try again next time
+      }
+      let lastReloadAt = 0;
+      try {
+        lastReloadAt = Number(sessionStorage.getItem(RELOAD_STAMP_KEY)) || 0;
+      } catch {
+        // storage unavailable: the 30-minute guard just can't remember across reloads
+      }
+      const now = Date.now();
+      const verdict = decideReload({
+        loadedBuild: process.env.NEXT_PUBLIC_BUILD_ID,
+        remoteBuild,
+        loadedAt,
+        now,
+        hour: new Date(now).getHours(),
+        idleMs: now - lastActivity,
+        lastReloadAt,
+      });
+      if (!verdict.reload) return;
+      try {
+        sessionStorage.setItem(RELOAD_STAMP_KEY, String(now));
+      } catch {
+        // see above
+      }
+      window.location.reload();
+    }
+
+    const interval = setInterval(check, CHECK_EVERY_MS);
+    return () => {
+      clearInterval(interval);
+      activityEvents.forEach((evt) => window.removeEventListener(evt, markActive));
+    };
+  }, [variant]);
 
   // Debounced so we log intent-to-search, not every keystroke.
   useEffect(() => {
@@ -500,7 +560,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
         </div>
       )}
 
-      {view === "list" ? (
+      {view === "list" && (
         <div
           key="list"
           className="animate-page-turn-in-list absolute inset-0 z-10 overflow-y-auto bg-[var(--seasonal-card)] pt-16 transition-colors duration-[600ms]"
@@ -528,8 +588,16 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
             onSelect={selectRecommendation}
           />
         </div>
-      ) : (
-        <div key="map" className="animate-page-turn-in-map absolute inset-0">
+      )}
+
+      {/* The map stays mounted while the List view covers it. Unmounting it threw
+          away the map's position, and meant tapping a listing in the list had no
+          map to fly to. Hidden, it can't be seen, tabbed to, or tapped. */}
+      <div
+        className={`absolute inset-0 ${view === "map" ? "animate-page-turn-in-map" : "pointer-events-none invisible"}`}
+        aria-hidden={view !== "map"}
+        inert={view !== "map"}
+      >
         <MapLibreMap
           ref={mapRef}
           initialViewState={{
@@ -593,8 +661,7 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
           <TreadwellMarker isSelected={selectedEntity?.type === "treadwell"} onClick={selectTreadwell} />
         </MapLibreMap>
         {loaderPhase !== "done" && <CompassLoader phase={loaderPhase === "idle" ? "idle" : "settling"} />}
-        </div>
-      )}
+      </div>
 
       {view === "map" && (
         <>
@@ -638,9 +705,20 @@ export function GuestMap({ variant = "mobile" }: { variant?: "kiosk" | "mobile" 
         />
       )}
 
-      {!recsLoading && recommendations.length === 0 && (
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-white/95 px-4 py-2 text-xs text-neutral-600 shadow-md">
-          No recommendations yet -- add some from /admin.
+      {/* Shown to guests when no listings are on screen. On the kiosk an outage gets
+          the full-screen overlay below instead, so skip it there to avoid doubling up. */}
+      {recommendations.length === 0 && (recsError || !recsLoading) && !(variant === "kiosk" && recsError) && (
+        <div className="pointer-events-auto absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-3 rounded-full bg-white/95 px-4 py-2 text-xs text-neutral-700 shadow-md">
+          <span>
+            {recsError
+              ? "We couldn't load the recommendations just now."
+              : "There are no recommendations to show right now."}
+          </span>
+          {recsError && (
+            <button type="button" onClick={() => reloadRecommendations()} className="font-semibold underline">
+              Try again
+            </button>
+          )}
         </div>
       )}
 

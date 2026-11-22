@@ -26,6 +26,17 @@ export function parseAdditionalCategories(
   return { categories: result };
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
+
+// 429 for the guest write routes. Retry-After is a hint to well-behaved clients.
+export function tooManyRequests(message: string, retryAfterSeconds = 3600) {
+  return NextResponse.json({ error: message }, { status: 429, headers: { "Retry-After": String(retryAfterSeconds) } });
+}
+
 export function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
